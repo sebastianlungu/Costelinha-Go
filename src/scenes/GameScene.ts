@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { WORLD, PLATFORMS, DEPTHS, PLAYER, COLLECTIBLES } from '../config/gameConfig';
+import { WORLD, PLATFORMS, DEPTHS, PLAYER, COLLECTIBLES, DEBUG } from '../config/gameConfig';
 import { Player } from '../objects/Player';
 import { Collectible } from '../objects/Collectible';
 import { Score } from '../systems/Score';
@@ -13,6 +13,9 @@ export class GameScene extends Phaser.Scene {
   private winOverlay?: Phaser.GameObjects.Container;
   private isGameWon: boolean = false;
   private keyR!: Phaser.Input.Keyboard.Key;
+  private keyD!: Phaser.Input.Keyboard.Key;
+  private debugGraphics?: Phaser.GameObjects.Graphics;
+  private isDebugEnabled: boolean = false;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -57,13 +60,6 @@ export class GameScene extends Phaser.Scene {
 
       // Add to static physics group
       this.platformGroup.add(platform, true);
-
-      // Log platform creation for debugging
-      if (index === 0) {
-        console.log(`🎮 Ground platform created at (${platformConfig.x}, ${platformConfig.y}) size: ${platformConfig.width}x${platformConfig.height}`);
-      } else {
-        console.log(`🎮 Floating platform ${index} created at (${platformConfig.x}, ${platformConfig.y}) size: ${platformConfig.width}x${platformConfig.height}`);
-      }
     });
 
     // Refresh the static group to ensure physics bodies are updated
@@ -72,15 +68,11 @@ export class GameScene extends Phaser.Scene {
     // Camera setup - fixed view initially (no follow yet)
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
 
-    console.log('🎮 Platforms created, camera bounds set, world ready');
-
     // Create player
     this.player = new Player(this, PLAYER.spawnX, PLAYER.spawnY);
 
     // Add collision between player and platforms
     this.physics.add.collider(this.player.sprite, this.platformGroup);
-
-    console.log('🎮 Player created and collisions set up');
 
     // Create bone group
     this.boneGroup = this.physics.add.group();
@@ -103,10 +95,11 @@ export class GameScene extends Phaser.Scene {
       this
     );
 
-    console.log('🎮 Bone overlap detection set up');
-
     // Setup R key for restart
     this.keyR = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+
+    // Setup D key for debug toggle
+    this.keyD = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
 
     // Listen to score changes to check for win condition
     this.scoreSystem.on('score-changed', this.checkWinCondition, this);
@@ -186,7 +179,34 @@ export class GameScene extends Phaser.Scene {
     this.scene.restart();
   }
 
+  private toggleDebug() {
+    this.isDebugEnabled = !this.isDebugEnabled;
+
+    if (this.isDebugEnabled) {
+      // Enable debug graphics
+      if (!this.debugGraphics) {
+        this.debugGraphics = this.add.graphics();
+        this.debugGraphics.setDepth(DEPTHS.debug);
+      }
+      this.physics.world.createDebugGraphic(this.debugGraphics);
+      console.log('🔍 Debug mode enabled (hitboxes visible)');
+    } else {
+      // Disable debug graphics
+      if (this.debugGraphics) {
+        this.debugGraphics.clear();
+        this.debugGraphics.destroy();
+        this.debugGraphics = undefined;
+      }
+      console.log('🔍 Debug mode disabled');
+    }
+  }
+
   update(time: number, delta: number) {
+    // Check for debug toggle
+    if (Phaser.Input.Keyboard.JustDown(this.keyD)) {
+      this.toggleDebug();
+    }
+
     // Check for restart key
     if (this.isGameWon && Phaser.Input.Keyboard.JustDown(this.keyR)) {
       this.restartGame();
@@ -196,6 +216,12 @@ export class GameScene extends Phaser.Scene {
     // Update player only if game is not won
     if (this.player && !this.isGameWon) {
       this.player.update(time, delta);
+    }
+
+    // Update debug graphics if enabled
+    if (this.isDebugEnabled && this.debugGraphics) {
+      this.debugGraphics.clear();
+      this.physics.world.debugGraphic = this.debugGraphics;
     }
   }
 }

@@ -8,7 +8,6 @@ export class Score extends Phaser.Events.EventEmitter {
   constructor() {
     super();
     this._totalBones = COLLECTIBLES.count;
-    console.log('⚙️ Score system initialized');
   }
 
   get score(): number {
@@ -22,12 +21,10 @@ export class Score extends Phaser.Events.EventEmitter {
   public addScore(points: number) {
     this._score += points;
     this.emit('score-changed', this._score, this._totalBones);
-    console.log(`⚙️ Score updated: ${this._score}/${this._totalBones}`);
   }
 
   public reset() {
     this._score = 0;
     this.emit('score-changed', this._score, this._totalBones);
-    console.log('⚙️ Score reset to 0');
   }
 }

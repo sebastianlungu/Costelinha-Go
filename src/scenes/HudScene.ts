@@ -31,13 +31,10 @@ export class HudScene extends Phaser.Scene {
 
     // Listen to score-changed event
     this.scoreSystem.on('score-changed', this.updateScore, this);
-
-    console.log('💻 HUD UI created and listening to score events');
   }
 
   private updateScore(score: number, totalBones: number) {
     this.scoreText.setText(`Bones: ${score}/${totalBones}`);
-    console.log(`💻 HUD updated: Bones: ${score}/${totalBones}`);
   }
 
   shutdown() {
