@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
-import { WORLD, PLATFORMS, DEPTHS } from '../config/gameConfig';
+import { WORLD, PLATFORMS, DEPTHS, PLAYER } from '../config/gameConfig';
+import { Player } from '../objects/Player';
 
 export class GameScene extends Phaser.Scene {
   private platformGroup!: Phaser.Physics.Arcade.StaticGroup;
+  private player!: Player;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -54,9 +56,20 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
 
     console.log('🎮 Platforms created, camera bounds set, world ready');
+
+    // Create player
+    this.player = new Player(this, PLAYER.spawnX, PLAYER.spawnY);
+
+    // Add collision between player and platforms
+    this.physics.add.collider(this.player.sprite, this.platformGroup);
+
+    console.log('🎮 Player created and collisions set up');
   }
 
   update(time: number, delta: number) {
-    // Game loop will be populated in future commits
+    // Update player
+    if (this.player) {
+      this.player.update(time, delta);
+    }
   }
 }
