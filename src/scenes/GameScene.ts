@@ -1,10 +1,14 @@
 import Phaser from 'phaser';
-import { WORLD, PLATFORMS, DEPTHS, PLAYER } from '../config/gameConfig';
+import { WORLD, PLATFORMS, DEPTHS, PLAYER, COLLECTIBLES } from '../config/gameConfig';
 import { Player } from '../objects/Player';
+import { Collectible } from '../objects/Collectible';
 
 export class GameScene extends Phaser.Scene {
   private platformGroup!: Phaser.Physics.Arcade.StaticGroup;
   private player!: Player;
+  private boneGroup!: Phaser.Physics.Arcade.Group;
+  private collectibles: Collectible[] = [];
+  private score: number = 0;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -64,6 +68,44 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player.sprite, this.platformGroup);
 
     console.log('🎮 Player created and collisions set up');
+
+    // Create bone group
+    this.boneGroup = this.physics.add.group();
+
+    // Spawn collectibles at positions from gameConfig
+    COLLECTIBLES.positions.forEach((pos, index) => {
+      const collectible = new Collectible(this, pos.x, pos.y);
+      this.collectibles.push(collectible);
+      this.boneGroup.add(collectible.sprite);
+    });
+
+    console.log(`🍖 ${COLLECTIBLES.count} bones spawned`);
+
+    // Add overlap detection between player and bones
+    this.physics.add.overlap(
+      this.player.sprite,
+      this.boneGroup,
+      this.handleBoneCollect,
+      undefined,
+      this
+    );
+
+    console.log('🎮 Bone overlap detection set up');
+  }
+
+  private handleBoneCollect(
+    playerSprite: Phaser.GameObjects.GameObject,
+    boneSprite: Phaser.GameObjects.GameObject
+  ) {
+    const bone = boneSprite as Phaser.Physics.Arcade.Sprite;
+
+    // CRITICAL: Disable body FIRST to prevent re-triggering overlap
+    bone.disableBody(true, true);
+
+    // Then increment score
+    this.score++;
+
+    console.log(`🍖 Collected bone, score: ${this.score}/${COLLECTIBLES.count}`);
   }
 
   update(time: number, delta: number) {
