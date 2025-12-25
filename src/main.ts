@@ -3,6 +3,7 @@ import { CANVAS, PHYSICS } from './config/gameConfig';
 import { BootScene } from './scenes/BootScene';
 import { MenuScene } from './scenes/MenuScene';
 import { GameScene } from './scenes/GameScene';
+import { HudScene } from './scenes/HudScene';
 
 console.log('🎮 Costelinha Runner starting...');
 
@@ -19,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: PHYSICS.debugShowBody,
     },
   },
-  scene: [BootScene, MenuScene, GameScene],
+  scene: [BootScene, MenuScene, GameScene, HudScene],
 };
 
 const game = new Phaser.Game(config);

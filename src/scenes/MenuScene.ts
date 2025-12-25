@@ -66,8 +66,8 @@ export class MenuScene extends Phaser.Scene {
     // Space key handler
     this.input.keyboard?.on('keydown-SPACE', () => {
       console.log('🎮 Starting GameScene...');
+      // GameScene will launch HudScene with the score system
       this.scene.start('GameScene');
-      this.scene.launch('HudScene');
     });
   }
 }

@@ -2,13 +2,14 @@ import Phaser from 'phaser';
 import { WORLD, PLATFORMS, DEPTHS, PLAYER, COLLECTIBLES } from '../config/gameConfig';
 import { Player } from '../objects/Player';
 import { Collectible } from '../objects/Collectible';
+import { Score } from '../systems/Score';
 
 export class GameScene extends Phaser.Scene {
   private platformGroup!: Phaser.Physics.Arcade.StaticGroup;
   private player!: Player;
   private boneGroup!: Phaser.Physics.Arcade.Group;
   private collectibles: Collectible[] = [];
-  private score: number = 0;
+  private scoreSystem!: Score;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -16,6 +17,12 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     console.log('🎮 GameScene created');
+
+    // Create score system
+    this.scoreSystem = new Score();
+
+    // Launch HudScene in parallel with the score system
+    this.scene.launch('HudScene', { scoreSystem: this.scoreSystem });
 
     // Set world bounds
     this.physics.world.setBounds(0, 0, WORLD.width, WORLD.height);
@@ -94,18 +101,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleBoneCollect(
-    playerSprite: Phaser.GameObjects.GameObject,
-    boneSprite: Phaser.GameObjects.GameObject
+    playerSprite: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
+    boneSprite: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
   ) {
     const bone = boneSprite as Phaser.Physics.Arcade.Sprite;
 
     // CRITICAL: Disable body FIRST to prevent re-triggering overlap
     bone.disableBody(true, true);
 
-    // Then increment score
-    this.score++;
+    // Then increment score using Score system
+    this.scoreSystem.addScore(1);
 
-    console.log(`🍖 Collected bone, score: ${this.score}/${COLLECTIBLES.count}`);
+    console.log(`🍖 Collected bone, score: ${this.scoreSystem.score}/${COLLECTIBLES.count}`);
   }
 
   update(time: number, delta: number) {

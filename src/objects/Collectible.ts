@@ -14,8 +14,9 @@ export class Collectible {
     // Set depth for proper layering
     this.sprite.setDepth(DEPTHS.collectibles);
 
-    // Enable physics body
-    this.sprite.body.setAllowGravity(false); // Bones float in place
+    // Enable physics body and disable gravity
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    body.setAllowGravity(false); // Bones float in place
 
     console.log(`🍖 Collectible spawned at (${x}, ${y})`);
   }
