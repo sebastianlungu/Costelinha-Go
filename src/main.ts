@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { CANVAS, PHYSICS } from './config/gameConfig';
+import { BootScene } from './scenes/BootScene';
+import { MenuScene } from './scenes/MenuScene';
 
 console.log('🎮 Costelinha Runner starting...');
 
@@ -16,7 +18,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: PHYSICS.debugShowBody,
     },
   },
-  scene: [],
+  scene: [BootScene, MenuScene],
 };
 
 const game = new Phaser.Game(config);
