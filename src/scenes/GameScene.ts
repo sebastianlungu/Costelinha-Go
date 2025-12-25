@@ -10,6 +10,9 @@ export class GameScene extends Phaser.Scene {
   private boneGroup!: Phaser.Physics.Arcade.Group;
   private collectibles: Collectible[] = [];
   private scoreSystem!: Score;
+  private winOverlay?: Phaser.GameObjects.Container;
+  private isGameWon: boolean = false;
+  private keyR!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -17,6 +20,9 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     console.log('🎮 GameScene created');
+
+    // Reset win state
+    this.isGameWon = false;
 
     // Create score system
     this.scoreSystem = new Score();
@@ -98,6 +104,12 @@ export class GameScene extends Phaser.Scene {
     );
 
     console.log('🎮 Bone overlap detection set up');
+
+    // Setup R key for restart
+    this.keyR = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+
+    // Listen to score changes to check for win condition
+    this.scoreSystem.on('score-changed', this.checkWinCondition, this);
   }
 
   private handleBoneCollect(
@@ -115,9 +127,74 @@ export class GameScene extends Phaser.Scene {
     console.log(`🍖 Collected bone, score: ${this.scoreSystem.score}/${COLLECTIBLES.count}`);
   }
 
+  private checkWinCondition(score: number) {
+    if (score >= COLLECTIBLES.count && !this.isGameWon) {
+      this.isGameWon = true;
+      this.showWinOverlay();
+      console.log('✅ You Win!');
+    }
+  }
+
+  private showWinOverlay() {
+    // Create container for win overlay
+    this.winOverlay = this.add.container(0, 0);
+
+    // Semi-transparent black background covering entire screen
+    const overlay = this.add.rectangle(
+      WORLD.width / 2,
+      WORLD.height / 2,
+      WORLD.width,
+      WORLD.height,
+      0x000000,
+      0.7
+    );
+
+    // "You Win!" text (large, center)
+    const winText = this.add.text(WORLD.width / 2, WORLD.height / 2 - 40, 'You Win!', {
+      fontSize: '64px',
+      color: '#ffffff',
+      fontFamily: 'Arial',
+      stroke: '#000000',
+      strokeThickness: 6,
+    });
+    winText.setOrigin(0.5, 0.5);
+
+    // "Press R to Restart" instruction (below win text)
+    const restartText = this.add.text(WORLD.width / 2, WORLD.height / 2 + 40, 'Press R to Restart', {
+      fontSize: '32px',
+      color: '#ffffff',
+      fontFamily: 'Arial',
+      stroke: '#000000',
+      strokeThickness: 4,
+    });
+    restartText.setOrigin(0.5, 0.5);
+
+    // Add all elements to container
+    this.winOverlay.add([overlay, winText, restartText]);
+
+    // Set depth to appear above everything
+    this.winOverlay.setDepth(1000);
+  }
+
+  private restartGame() {
+    console.log('🎮 Restarting game...');
+
+    // Stop HudScene
+    this.scene.stop('HudScene');
+
+    // Restart GameScene (this will call create() again)
+    this.scene.restart();
+  }
+
   update(time: number, delta: number) {
-    // Update player
-    if (this.player) {
+    // Check for restart key
+    if (this.isGameWon && Phaser.Input.Keyboard.JustDown(this.keyR)) {
+      this.restartGame();
+      return;
+    }
+
+    // Update player only if game is not won
+    if (this.player && !this.isGameWon) {
       this.player.update(time, delta);
     }
   }
