@@ -15,7 +15,7 @@ export const WORLD = {
 
 // Physics
 export const PHYSICS = {
-  gravity: 800,
+  gravity: 900,
   debugShowBody: false,
   debugShowStaticBody: false,
   debugShowVelocity: false,
@@ -23,14 +23,14 @@ export const PHYSICS = {
 
 // Player
 export const PLAYER = {
-  speed: 200,
-  jumpVelocity: -400,
+  speed: 250,
+  jumpVelocity: -450,
   width: 48,
   height: 48,
   spawnX: 100,
   spawnY: 550, // groundTopY - playerHeight with some buffer
-  acceleration: 600,
-  drag: 500,
+  acceleration: 800,
+  drag: 600,
 };
 
 // Platforms
@@ -92,11 +92,11 @@ export const DEPTHS = {
 
 // Debug flags
 export const DEBUG = {
-  enabled: true, // Set false for production
-  showHitboxes: true, // Draw collision boxes
-  showBaseline: true, // Pink line at ground level
-  showFPS: true, // DOM FPS counter (not canvas)
-  showSpawnZones: true, // Visualize spawn areas
+  enabled: false, // Set false for production
+  showHitboxes: false, // Draw collision boxes
+  showBaseline: false, // Pink line at ground level
+  showFPS: false, // DOM FPS counter (not canvas)
+  showSpawnZones: false, // Visualize spawn areas
   logPhysics: false, // Console log collisions
 };
 
