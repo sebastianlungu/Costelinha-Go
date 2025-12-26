@@ -85,26 +85,117 @@ export const DEPTHS = {
   background: 0,
   platforms: 10,
   collectibles: 15,
+  particles: 18,
   player: 20,
   hud: 100,
   debug: 9999,
 };
 
-// Debug flags
-export const DEBUG = {
-  enabled: false, // Set false for production
-  showHitboxes: false, // Draw collision boxes
-  showBaseline: false, // Pink line at ground level
-  showFPS: false, // DOM FPS counter (not canvas)
-  showSpawnZones: false, // Visualize spawn areas
-  logPhysics: false, // Console log collisions
+// Camera settings
+export const CAMERA = {
+  followLerp: 0.12,
+  deadzone: {
+    width: 300,
+    height: 180,
+  },
+  shake: {
+    duration: 100,
+    intensity: 0.001, // Reduced from 0.003 for more subtle effect
+  },
 };
 
-// Colors (for procedural graphics)
-export const COLORS = {
-  platform: 0x4CAF50, // Green
-  player: 0xFF5722, // Orange-red (placeholder)
-  collectible: 0xFFEB3B, // Yellow
-  debugHitbox: 0xFF00FF, // Magenta
-  debugBaseline: 0xFF1493, // Deep pink
+// UI Design System - Color Palette
+export const UI_COLORS = {
+  // Primary colors
+  primary: '#FF6B35', // Vibrant orange-red (matches dog/energy theme)
+  primaryDark: '#D9542E', // Darker shade for depth
+  primaryLight: '#FF8757', // Lighter shade for highlights
+
+  // Secondary colors
+  secondary: '#4ECDC4', // Teal (complementary to orange)
+  secondaryDark: '#3DB5AD', // Darker teal
+  secondaryLight: '#6FD9D2', // Lighter teal
+
+  // Neutral colors
+  background: '#2C3E50', // Dark blue-gray
+  backgroundLight: '#34495E', // Lighter gray for panels
+  backgroundDark: '#1A252F', // Darker for shadows
+
+  // Text colors
+  textPrimary: '#FFFFFF', // White for primary text
+  textSecondary: '#ECF0F1', // Off-white for secondary text
+  textAccent: '#FFD93D', // Yellow for highlights/scores
+
+  // UI element colors
+  panelBg: '#2C3E50', // Panel background
+  panelBorder: '#FF6B35', // Panel border (primary color)
+  buttonBg: '#FF6B35', // Button background
+  buttonHover: '#FF8757', // Button hover state
+  buttonText: '#FFFFFF', // Button text
+
+  // Status colors
+  success: '#6BCF7F', // Green for success/collection
+  warning: '#FFD93D', // Yellow for warnings
+  danger: '#E74C3C', // Red for damage/danger
+};
+
+// UI Design System - Typography
+export const UI_TYPOGRAPHY = {
+  // Font family (loaded via Google Fonts in index.html)
+  fontFamily: '"Press Start 2P", cursive',
+
+  // Font sizes (pixel perfect sizes for retro feel)
+  sizeXXL: '48px', // Main title
+  sizeXL: '32px', // Subtitles
+  sizeLarge: '24px', // Headers
+  sizeMedium: '16px', // Body text, buttons
+  sizeSmall: '12px', // Small labels, hints
+  sizeXS: '8px', // Tiny credits
+
+  // Line heights (tight for pixel fonts)
+  lineHeightTight: 1.2,
+  lineHeightNormal: 1.4,
+  lineHeightRelaxed: 1.6,
+};
+
+// UI Design System - Spacing
+export const UI_SPACING = {
+  // Base spacing unit (8px grid system)
+  unit: 8,
+
+  // Specific spacing values
+  xs: 4,
+  small: 8,
+  medium: 16,
+  large: 24,
+  xl: 32,
+  xxl: 48,
+
+  // Padding
+  paddingSmall: 8,
+  paddingMedium: 16,
+  paddingLarge: 24,
+
+  // Margins
+  marginSmall: 8,
+  marginMedium: 16,
+  marginLarge: 24,
+};
+
+// UI Design System - Layout
+export const UI_LAYOUT = {
+  // Border radius (minimal for pixel art aesthetic)
+  borderRadiusSmall: 4,
+  borderRadiusMedium: 8,
+  borderRadiusLarge: 12,
+
+  // Border thickness
+  borderThin: 2,
+  borderMedium: 3,
+  borderThick: 4,
+
+  // Shadow depths (for 3D button effect)
+  shadowShallow: 2,
+  shadowMedium: 4,
+  shadowDeep: 6,
 };
