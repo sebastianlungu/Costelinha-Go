@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { WORLD, PLATFORMS, DEPTHS, PLAYER, COLLECTIBLES, DEBUG } from '../config/gameConfig';
+import { WORLD, PLATFORMS, DEPTHS, PLAYER, COLLECTIBLES, CAMERA } from '../config/gameConfig';
 import { Player } from '../objects/Player';
 import { Collectible } from '../objects/Collectible';
 import { Score } from '../systems/Score';
@@ -16,6 +16,11 @@ export class GameScene extends Phaser.Scene {
   private keyD!: Phaser.Input.Keyboard.Key;
   private debugGraphics?: Phaser.GameObjects.Graphics;
   private isDebugEnabled: boolean = false;
+  private sparkleEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private dustEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private gameMusic?: Phaser.Sound.BaseSound;
+  private lastLandSoundTime: number = 0;
+  private landSoundThrottle: number = 200; // Minimum ms between land sounds
 
   constructor() {
     super({ key: 'GameScene' });
@@ -27,6 +32,14 @@ export class GameScene extends Phaser.Scene {
     // Reset win state
     this.isGameWon = false;
 
+    // Start game background music
+    this.gameMusic = this.sound.add('game_music', {
+      loop: true,
+      volume: 0.35,
+    });
+    this.gameMusic.play();
+    console.log('🎵 Game music started');
+
     // Create score system
     this.scoreSystem = new Score();
 
@@ -36,30 +49,15 @@ export class GameScene extends Phaser.Scene {
     // Set world bounds
     this.physics.world.setBounds(0, 0, WORLD.width, WORLD.height);
 
+    // Create parallax background layers
+    this.createParallaxBackground();
+
     // Create static physics group for platforms
     this.platformGroup = this.physics.add.staticGroup();
 
-    // Create all platforms from gameConfig.PLATFORMS array
+    // Create all platforms from gameConfig.PLATFORMS array using tiles
     PLATFORMS.forEach((platformConfig, index) => {
-      // Create platform sprite using the procedural 'platform' texture
-      const platform = this.add.sprite(
-        platformConfig.x,
-        platformConfig.y,
-        'platform'
-      );
-
-      // Set the origin to top-left for easier positioning
-      platform.setOrigin(0, 0);
-
-      // Scale the platform to match the configured dimensions
-      // The procedural texture is 100x20, so we scale it to desired width/height
-      platform.setDisplaySize(platformConfig.width, platformConfig.height);
-
-      // Set depth for proper layering
-      platform.setDepth(DEPTHS.platforms);
-
-      // Add to static physics group
-      this.platformGroup.add(platform, true);
+      this.createTiledPlatform(platformConfig);
     });
 
     // Refresh the static group to ensure physics bodies are updated
@@ -68,14 +66,37 @@ export class GameScene extends Phaser.Scene {
     // Camera setup - fixed view initially (no follow yet)
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
 
-    // Create player
-    this.player = new Player(this, PLAYER.spawnX, PLAYER.spawnY);
+    // Create particle emitters for juice effects
+    this.createParticleEmitters();
+
+    // Create player (EXACTLY once per GameScene instance)
+    this.player = new Player(this, PLAYER.spawnX, PLAYER.spawnY, this.dustEmitter);
+
+    // RUNTIME ASSERTION: Verify only ONE player sprite exists in this scene
+    // This catches bugs where player might be created multiple times
+    const playerSprites = this.children.list.filter(
+      child => child instanceof Phaser.Physics.Arcade.Sprite && child.texture.key.startsWith('dog_')
+    );
+    if (playerSprites.length !== 1) {
+      throw new Error(`❌ CRITICAL BUG: Expected exactly 1 player sprite, found ${playerSprites.length}. Check for duplicate player creation.`);
+    }
+    console.log(`🐕 Player instance verified (count: ${playerSprites.length})`);
 
     // Add collision between player and platforms
     this.physics.add.collider(this.player.sprite, this.platformGroup);
 
-    // Create bone group
-    this.boneGroup = this.physics.add.group();
+    // Setup smooth camera follow with deadzone
+    this.cameras.main.startFollow(this.player.sprite, true, CAMERA.followLerp, CAMERA.followLerp);
+    this.cameras.main.setDeadzone(CAMERA.deadzone.width, CAMERA.deadzone.height);
+
+    // Listen to player events
+    this.player.on('landed', this.handlePlayerLanding, this);
+    this.player.on('jumped', this.handlePlayerJump, this);
+
+    // Create bone group with allowGravity disabled for all children
+    this.boneGroup = this.physics.add.group({
+      allowGravity: false, // Disable gravity for all bones in this group
+    });
 
     // Spawn collectibles at positions from gameConfig
     COLLECTIBLES.positions.forEach((pos, index) => {
@@ -105,11 +126,147 @@ export class GameScene extends Phaser.Scene {
     this.scoreSystem.on('score-changed', this.checkWinCondition, this);
   }
 
+  private createTiledPlatform(config: { x: number; y: number; width: number; height: number }) {
+    // Tile size from Kenney assets (all tiles are 21x21px)
+    const TILE_SIZE = 21;
+
+    // Calculate how many tiles we need
+    const tilesWide = Math.ceil(config.width / TILE_SIZE);
+    const tilesHigh = Math.ceil(config.height / TILE_SIZE);
+
+    // Create tiles to fill the platform area
+    for (let row = 0; row < tilesHigh; row++) {
+      for (let col = 0; col < tilesWide; col++) {
+        const tileX = config.x + col * TILE_SIZE;
+        const tileY = config.y + row * TILE_SIZE;
+
+        // Choose tile texture based on position
+        let tileKey: string;
+        if (row === 0) {
+          // Top row uses grass top tile
+          tileKey = 'tile_grass_top';
+        } else {
+          // Other rows use dirt tiles (alternate for variety)
+          tileKey = (col + row) % 2 === 0 ? 'tile_dirt' : 'tile_dirt_alt';
+        }
+
+        // Create tile sprite
+        const tile = this.add.sprite(tileX, tileY, tileKey);
+        tile.setOrigin(0, 0);
+        tile.setDepth(DEPTHS.platforms);
+
+        // Add to physics group
+        this.platformGroup.add(tile, true);
+      }
+    }
+  }
+
+  private createParticleEmitters() {
+    // Create sparkle emitter for bone collection (burst mode)
+    this.sparkleEmitter = this.add.particles(0, 0, 'particle_star', {
+      speed: { min: 50, max: 150 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.15, end: 0 },
+      alpha: { start: 1, end: 0 },
+      lifespan: 600,
+      gravityY: 0,
+      blendMode: 'ADD',
+      frequency: -1, // Burst mode (manual emit)
+    });
+    this.sparkleEmitter.setDepth(DEPTHS.particles);
+
+    // Create dust emitter for jump/land (burst mode)
+    this.dustEmitter = this.add.particles(0, 0, 'particle_dust', {
+      speed: { min: 20, max: 60 },
+      angle: { min: -120, max: -60 }, // Spray upward and outward
+      scale: { start: 0.08, end: 0 },
+      alpha: { start: 0.6, end: 0 },
+      lifespan: 400,
+      gravityY: 100,
+      blendMode: 'NORMAL',
+      frequency: -1, // Burst mode (manual emit)
+    });
+    this.dustEmitter.setDepth(DEPTHS.particles);
+
+    console.log('💥 Particle emitters created');
+  }
+
+  private createParallaxBackground() {
+    // Layer 1: Sky background (tiled, fills entire screen, static)
+    const skyTile = this.add.tileSprite(0, 0, WORLD.width, WORLD.height, 'bg_sky');
+    skyTile.setOrigin(0, 0);
+    skyTile.setDepth(DEPTHS.background);
+    skyTile.setScrollFactor(0); // Static, doesn't move with camera
+
+    // Layer 2: Sun (decorative, top-right, slow parallax)
+    const sun = this.add.image(WORLD.width - 150, 100, 'bg_sun');
+    sun.setScale(3); // Make sun larger
+    sun.setDepth(DEPTHS.background + 1);
+    sun.setScrollFactor(0.1); // Very slow movement for distant object
+
+    // Layer 3: Far clouds (slow parallax)
+    const cloudFar1 = this.add.image(200, 120, 'bg_clouds_far');
+    cloudFar1.setScale(2.5);
+    cloudFar1.setDepth(DEPTHS.background + 2);
+    cloudFar1.setScrollFactor(0.2);
+
+    const cloudFar2 = this.add.image(600, 80, 'bg_clouds_far');
+    cloudFar2.setScale(2);
+    cloudFar2.setDepth(DEPTHS.background + 2);
+    cloudFar2.setScrollFactor(0.2);
+
+    const cloudFar3 = this.add.image(1000, 140, 'bg_clouds_far');
+    cloudFar3.setScale(2.8);
+    cloudFar3.setDepth(DEPTHS.background + 2);
+    cloudFar3.setScrollFactor(0.2);
+
+    // Layer 4: Near clouds (medium parallax)
+    const cloudNear1 = this.add.image(300, 180, 'bg_clouds_near');
+    cloudNear1.setScale(2);
+    cloudNear1.setDepth(DEPTHS.background + 3);
+    cloudNear1.setScrollFactor(0.4);
+
+    const cloudNear2 = this.add.image(800, 160, 'bg_clouds_near');
+    cloudNear2.setScale(2.3);
+    cloudNear2.setDepth(DEPTHS.background + 3);
+    cloudNear2.setScrollFactor(0.4);
+
+    // Layer 5: Foreground grass decorations (faster parallax, near platforms)
+    const grass1 = this.add.image(100, WORLD.groundTopY - 10, 'bg_grass_decor');
+    grass1.setScale(4);
+    grass1.setDepth(DEPTHS.background + 4);
+    grass1.setScrollFactor(0.8);
+
+    const grass2 = this.add.image(400, WORLD.groundTopY - 10, 'bg_grass_decor');
+    grass2.setScale(4);
+    grass2.setDepth(DEPTHS.background + 4);
+    grass2.setScrollFactor(0.8);
+
+    const grass3 = this.add.image(700, WORLD.groundTopY - 10, 'bg_grass_decor');
+    grass3.setScale(4);
+    grass3.setDepth(DEPTHS.background + 4);
+    grass3.setScrollFactor(0.8);
+
+    const grass4 = this.add.image(1000, WORLD.groundTopY - 10, 'bg_grass_decor');
+    grass4.setScale(4);
+    grass4.setDepth(DEPTHS.background + 4);
+    grass4.setScrollFactor(0.8);
+
+    console.log('🎨 Parallax background created with 5 layers');
+  }
+
   private handleBoneCollect(
     playerSprite: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
     boneSprite: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
   ) {
     const bone = boneSprite as Phaser.Physics.Arcade.Sprite;
+
+    // Emit sparkle particles at bone position
+    this.sparkleEmitter.emitParticleAt(bone.x, bone.y, 12);
+
+    // Play collect sound
+    this.sound.play('collect_sfx', { volume: 0.7 });
+    console.log('🎵 Collect sound played');
 
     // CRITICAL: Disable body FIRST to prevent re-triggering overlap
     bone.disableBody(true, true);
@@ -117,7 +274,26 @@ export class GameScene extends Phaser.Scene {
     // Then increment score using Score system
     this.scoreSystem.addScore(1);
 
-    console.log(`🍖 Collected bone, score: ${this.scoreSystem.score}/${COLLECTIBLES.count}`);
+    console.log(`🍖 Collected bone at (${bone.x}, ${bone.y}), score: ${this.scoreSystem.score}/${COLLECTIBLES.count}`);
+  }
+
+  private handlePlayerJump() {
+    // Play jump sound
+    this.sound.play('jump_sfx', { volume: 0.7 });
+    console.log('🎵 Jump sound played');
+  }
+
+  private handlePlayerLanding() {
+    // Throttle land sound to prevent spam
+    const currentTime = this.time.now;
+    if (currentTime - this.lastLandSoundTime > this.landSoundThrottle) {
+      this.sound.play('land_sfx', { volume: 0.6 });
+      this.lastLandSoundTime = currentTime;
+      console.log('🎵 Land sound played');
+    }
+
+    // Subtle camera shake on landing
+    this.cameras.main.shake(CAMERA.shake.duration, CAMERA.shake.intensity);
   }
 
   private checkWinCondition(score: number) {
@@ -129,6 +305,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showWinOverlay() {
+    // Stop game music
+    if (this.gameMusic) {
+      this.gameMusic.stop();
+      console.log('🎵 Game music stopped');
+    }
+
+    // Play win sound
+    this.sound.play('win_sfx', { volume: 0.8 });
+    console.log('🎵 Win sound played');
+
     // Create container for win overlay
     this.winOverlay = this.add.container(0, 0);
 
@@ -172,10 +358,16 @@ export class GameScene extends Phaser.Scene {
   private restartGame() {
     console.log('🎮 Restarting game...');
 
+    // Stop game music before restart
+    if (this.gameMusic) {
+      this.gameMusic.stop();
+      console.log('🎵 Game music stopped for restart');
+    }
+
     // Stop HudScene
     this.scene.stop('HudScene');
 
-    // Restart GameScene (this will call create() again)
+    // Restart GameScene (this will call create() again, which will start new music)
     this.scene.restart();
   }
 

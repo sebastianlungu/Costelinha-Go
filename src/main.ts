@@ -13,6 +13,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: CANVAS.height,
   backgroundColor: CANVAS.backgroundColor,
   parent: 'game',
+  pixelArt: true, // Enable crisp pixel art rendering (nearest-neighbor filtering)
   physics: {
     default: 'arcade',
     arcade: {

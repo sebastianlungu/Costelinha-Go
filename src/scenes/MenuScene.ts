@@ -9,6 +9,8 @@ import {
 
 export class MenuScene extends Phaser.Scene {
   private playButton?: Phaser.GameObjects.Container;
+  private menuMusic?: Phaser.Sound.BaseSound;
+  private isAudioUnlocked: boolean = false;
 
   constructor() {
     super({ key: 'MenuScene' });
@@ -16,6 +18,24 @@ export class MenuScene extends Phaser.Scene {
 
   create() {
     console.log('🎮 MenuScene created');
+
+    // Try to start menu music (will be blocked by browser until first user gesture)
+    this.menuMusic = this.sound.add('menu_music', {
+      loop: true,
+      volume: 0.3,
+    });
+
+    // Attempt to play (may be blocked by browser autoplay policy)
+    this.menuMusic.play();
+
+    // Audio unlock on first interaction
+    this.input.once('pointerdown', () => {
+      if (!this.isAudioUnlocked && this.menuMusic && !this.menuMusic.isPlaying) {
+        this.menuMusic.play();
+        this.isAudioUnlocked = true;
+        console.log('🎵 Audio unlocked - menu music started');
+      }
+    });
 
     // Display menu background scaled to fit 1280x720 canvas
     const background = this.add.image(
@@ -80,6 +100,16 @@ export class MenuScene extends Phaser.Scene {
       'PLAY',
       () => {
         console.log('🎮 Starting GameScene...');
+        // Play UI click sound
+        this.sound.play('ui_click_sfx', { volume: 0.6 });
+        console.log('🎵 UI click sound played');
+
+        // Stop menu music before transitioning
+        if (this.menuMusic) {
+          this.menuMusic.stop();
+          console.log('🎵 Menu music stopped');
+        }
+
         this.scene.start('GameScene');
       }
     );
@@ -105,6 +135,16 @@ export class MenuScene extends Phaser.Scene {
     // Space key handler (alternative to button click)
     this.input.keyboard?.on('keydown-SPACE', () => {
       console.log('🎮 Starting GameScene...');
+      // Play UI click sound
+      this.sound.play('ui_click_sfx', { volume: 0.6 });
+      console.log('🎵 UI click sound played');
+
+      // Stop menu music before transitioning
+      if (this.menuMusic) {
+        this.menuMusic.stop();
+        console.log('🎵 Menu music stopped');
+      }
+
       this.scene.start('GameScene');
     });
   }

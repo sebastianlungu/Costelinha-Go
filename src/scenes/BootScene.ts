@@ -67,6 +67,20 @@ export class BootScene extends Phaser.Scene {
     this.load.image('ui_arrow_up', '/ui/arrowUp.png'); // Up arrow
     this.load.image('ui_arrow_left', '/ui/arrowLeft.png'); // Left arrow
     this.load.image('ui_arrow_right', '/ui/arrowRight.png'); // Right arrow
+
+    // Load audio assets
+    console.log('🎵 Loading audio assets...');
+
+    // Music
+    this.load.audio('menu_music', '/audio/music/menu_music.mp3');
+    this.load.audio('game_music', '/audio/music/game_music.ogg');
+
+    // SFX
+    this.load.audio('jump_sfx', '/audio/sfx/jump.wav');
+    this.load.audio('land_sfx', '/audio/sfx/land.wav');
+    this.load.audio('collect_sfx', '/audio/sfx/collect.wav');
+    this.load.audio('ui_click_sfx', '/audio/sfx/ui_click.ogg');
+    this.load.audio('win_sfx', '/audio/sfx/win.ogg');
   }
 
   create() {
@@ -138,5 +152,37 @@ Asset paths should be relative to public root (e.g., '/atlas/dog.png' not '/asse
     }
 
     console.log('✅ Asset validation passed - all required textures loaded');
+
+    // Validate audio assets
+    const requiredAudio = [
+      'menu_music',      // Menu background music
+      'game_music',      // Game background music
+      'jump_sfx',        // Jump sound effect
+      'land_sfx',        // Landing sound effect
+      'collect_sfx',     // Collect bone sound effect
+      'ui_click_sfx',    // UI click sound effect
+      'win_sfx',         // Win jingle sound effect
+    ];
+
+    const missingAudio: string[] = [];
+
+    for (const key of requiredAudio) {
+      if (!this.cache.audio.exists(key)) {
+        missingAudio.push(key);
+      }
+    }
+
+    // Fail loud if any audio is missing
+    if (missingAudio.length > 0) {
+      const errorMsg = `❌ AUDIO LOAD FAILED: Missing audio key(s): ${missingAudio.join(', ')}
+
+Check BootScene.preload() to ensure these audio assets are loaded correctly.
+Audio paths should be relative to public root (e.g., '/audio/music/menu_music.mp3')`;
+
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    console.log('✅ Audio validation passed - all required audio loaded');
   }
 }
