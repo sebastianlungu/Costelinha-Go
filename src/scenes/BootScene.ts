@@ -75,10 +75,10 @@ export class BootScene extends Phaser.Scene {
     this.load.audio('menu_music', '/audio/music/menu_music.mp3');
     this.load.audio('game_music', '/audio/music/game_music.ogg');
 
-    // SFX
-    this.load.audio('jump_sfx', '/audio/sfx/jump.wav');
-    this.load.audio('land_sfx', '/audio/sfx/land.wav');
-    this.load.audio('collect_sfx', '/audio/sfx/collect.wav');
+    // SFX (all OGG format from Motion Monkey Retro Arcade Sounds Pack - CC0)
+    this.load.audio('jump_sfx', '/audio/sfx/jump.ogg');
+    this.load.audio('land_sfx', '/audio/sfx/land.ogg');
+    this.load.audio('collect_sfx', '/audio/sfx/collect.ogg');
     this.load.audio('ui_click_sfx', '/audio/sfx/ui_click.ogg');
     this.load.audio('win_sfx', '/audio/sfx/win.ogg');
   }
