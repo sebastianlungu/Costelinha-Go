@@ -19,22 +19,32 @@ export class MenuScene extends Phaser.Scene {
   create() {
     console.log('🎮 MenuScene created');
 
-    // Try to start menu music (will be blocked by browser until first user gesture)
+    // Create menu music (don't play yet - wait for user interaction)
     this.menuMusic = this.sound.add('menu_music', {
       loop: true,
       volume: 0.3,
     });
 
-    // Attempt to play (may be blocked by browser autoplay policy)
-    this.menuMusic.play();
-
-    // Audio unlock on first interaction
+    // Add audio unlock handler for browser autoplay restrictions
     this.input.once('pointerdown', () => {
-      if (!this.isAudioUnlocked && this.menuMusic && !this.menuMusic.isPlaying) {
-        this.menuMusic.play();
-        this.isAudioUnlocked = true;
-        console.log('🎵 Audio unlocked - menu music started');
+      // Unlock Web Audio on first user interaction
+      if (this.sound.context && this.sound.context.state === 'suspended') {
+        this.sound.context.resume().then(() => {
+          console.log('🎵 Web Audio unlocked');
+          const music = this.sound.get('menu_music') as Phaser.Sound.WebAudioSound;
+          if (music && !music.isPlaying) {
+            music.play({ loop: true, volume: 0.3 });
+            this.isAudioUnlocked = true;
+          }
+        });
+      } else {
+        const music = this.sound.get('menu_music') as Phaser.Sound.WebAudioSound;
+        if (music && !music.isPlaying) {
+          music.play({ loop: true, volume: 0.3 });
+          this.isAudioUnlocked = true;
+        }
       }
+      console.log('🎵 Audio unlock triggered on first click');
     });
 
     // Display menu background scaled to fit 1280x720 canvas

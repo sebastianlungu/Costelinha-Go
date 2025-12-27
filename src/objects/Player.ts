@@ -17,11 +17,13 @@ export class Player extends Phaser.Events.EventEmitter {
     this.scene = scene;
     this.dustEmitter = dustEmitter;
 
-    // Create sprite with physics (use first frame of idle spritesheet)
-    this.sprite = scene.physics.add.sprite(x, y, 'dog_idle', 0);
+    // Create sprite with physics (use first idle frame)
+    this.sprite = scene.physics.add.sprite(x, y, 'dog_idle_1');
+
+    // Scale down the sprite (PNGs are ~327x268, need to scale to ~48x48)
+    this.sprite.setScale(0.15);
 
     // Set physics body size to match config
-    this.sprite.setDisplaySize(PLAYER.width, PLAYER.height);
     this.sprite.body.setSize(PLAYER.width, PLAYER.height);
 
     // Set depth for proper layering
@@ -39,58 +41,10 @@ export class Player extends Phaser.Events.EventEmitter {
     this.keyA = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.keyD = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
 
-    // Create animations
-    this.createAnimations();
-
-    // Start with idle animation
-    this.sprite.play('idle_left', true);
+    // Start with idle animation (animations are created in BootScene)
+    this.sprite.play('idle', true);
 
     console.log(`🐕 Player spawned at (${x}, ${y})`);
-  }
-
-  private createAnimations() {
-    const anims = this.scene.anims;
-
-    // Create animations from spritesheets (each spritesheet has multiple frames)
-    // idle: 5 frames
-    if (!anims.exists('idle_left')) {
-      anims.create({
-        key: 'idle_left',
-        frames: anims.generateFrameNumbers('dog_idle', { start: 0, end: 4 }),
-        frameRate: 8,
-        repeat: -1,
-      });
-    }
-
-    // walk: 5 frames
-    if (!anims.exists('walk_left')) {
-      anims.create({
-        key: 'walk_left',
-        frames: anims.generateFrameNumbers('dog_walk', { start: 0, end: 4 }),
-        frameRate: 10,
-        repeat: -1,
-      });
-    }
-
-    // jump: 2 frames
-    if (!anims.exists('jump_left')) {
-      anims.create({
-        key: 'jump_left',
-        frames: anims.generateFrameNumbers('dog_jump', { start: 0, end: 1 }),
-        frameRate: 10,
-        repeat: 0,
-      });
-    }
-
-    // land: 2 frames
-    if (!anims.exists('land_left')) {
-      anims.create({
-        key: 'land_left',
-        frames: anims.generateFrameNumbers('dog_land', { start: 0, end: 1 }),
-        frameRate: 10,
-        repeat: 0,
-      });
-    }
   }
 
   public update(time: number, delta: number) {
@@ -155,23 +109,21 @@ export class Player extends Phaser.Events.EventEmitter {
     if (isGrounded) {
       if (isMoving && this.animState !== 'walk') {
         this.animState = 'walk';
-        this.sprite.play('walk_left', true);
+        this.sprite.play('walk', true);
       } else if (!isMoving && this.animState !== 'idle') {
         this.animState = 'idle';
-        this.sprite.play('idle_left', true);
+        this.sprite.play('idle', true);
       }
     } else {
       // In air
       if (body.velocity.y < 0 && this.animState !== 'jump') {
         // Jumping up
         this.animState = 'jump';
-        this.sprite.play('jump_left', true);
-      } else if (body.velocity.y > 0 && this.animState !== 'land') {
+        this.sprite.play('jump', true);
+      } else if (body.velocity.y > 0 && this.animState !== 'fall') {
         // Falling down
-        this.animState = 'land';
-        this.sprite.play('land_left', true);
-        // Lock animations briefly after landing to prevent jitter
-        this.landingLockUntil = time + 100;
+        this.animState = 'fall';
+        this.sprite.play('fall', true);
       }
     }
   }

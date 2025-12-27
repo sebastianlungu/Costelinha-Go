@@ -8,31 +8,23 @@ export class BootScene extends Phaser.Scene {
   preload() {
     console.log('🎨 Loading assets...');
 
-    // Load dog sprite sheets (NOT atlas - each file is a horizontal spritesheet)
+    // Load dog animation frames as individual images
     // Note: Vite serves assets/ as public root, so reference from /
-    // idle: 5 frames of 374.8x301 each (1874 width / 5 frames)
-    this.load.spritesheet('dog_idle', '/atlas/NOBGdog_idle_left_5x48x48.png', {
-      frameWidth: 374.8,
-      frameHeight: 301,
-    });
+    // Idle frames (4 frames)
+    this.load.image('dog_idle_1', '/atlas/idle1.png');
+    this.load.image('dog_idle_2', '/atlas/idle2.png');
+    this.load.image('dog_idle_3', '/atlas/idle3.png');
+    this.load.image('dog_idle_4', '/atlas/idle4.png');
 
-    // walk: 5 frames of 382x268 each (1910 width / 5 frames)
-    this.load.spritesheet('dog_walk', '/atlas/NOBGdog_walk_left_5x48x48.png', {
-      frameWidth: 382,
-      frameHeight: 268,
-    });
+    // Walk frames (3 frames)
+    this.load.image('dog_walk_1', '/atlas/walk1.png');
+    this.load.image('dog_walk_2', '/atlas/walk2.png');
+    this.load.image('dog_walk_3', '/atlas/walk3.png');
 
-    // jump: 2 frames of 759x352 each (1518 width / 2 frames)
-    this.load.spritesheet('dog_jump', '/atlas/NOBGdog_jump_left_2x48x48.png', {
-      frameWidth: 759,
-      frameHeight: 352,
-    });
-
-    // land: 2 frames of 820x312 each (1640 width / 2 frames)
-    this.load.spritesheet('dog_land', '/atlas/NOBGdog_land_left_2x48x48.png', {
-      frameWidth: 820,
-      frameHeight: 312,
-    });
+    // Jump frames (3 frames: jump, airborne, falling)
+    this.load.image('dog_jump', '/atlas/jump.png');
+    this.load.image('dog_airborne', '/atlas/airborne.png');
+    this.load.image('dog_falling', '/atlas/falling.png');
 
     // Load menu background
     this.load.image('menu_background', '/menu_background.png');
@@ -42,22 +34,26 @@ export class BootScene extends Phaser.Scene {
 
     // Load parallax background layers (Kenney assets)
     this.load.image('bg_sky', '/tiles/Backgrounds/tile_0000.png'); // Light blue sky tile
-    this.load.image('bg_clouds_far', '/backgrounds/cloud1.png'); // Far clouds
+    // TEMPORARILY DISABLED - Assets not in current build
+    // this.load.image('bg_clouds_far', '/backgrounds/cloud1.png'); // Far clouds
     this.load.image('bg_clouds_near', '/backgrounds/cloud2.png'); // Near clouds
-    this.load.image('bg_sun', '/backgrounds/sun.png'); // Sun decoration
+    // this.load.image('bg_sun', '/backgrounds/sun.png'); // Sun decoration
     this.load.image('bg_grass_decor', '/backgrounds/grass1.png'); // Foreground grass decoration
 
     // Load platform tiles (Kenney pixel platformer - 21x21px tiles)
-    this.load.image('tile_grass_top', '/tiles/tile_0001.png'); // Brown grass top
+    // TEMPORARILY DISABLED - Path mismatch (exists in assets/tiles/ not /tiles/)
+    // this.load.image('tile_grass_top', '/tiles/tile_0001.png'); // Brown grass top
     this.load.image('tile_dirt', '/tiles/tile_0002.png'); // Brown dirt
     this.load.image('tile_dirt_alt', '/tiles/tile_0003.png'); // Brown dirt variant
 
     // Load particle effects (Kenney particle pack)
-    this.load.image('particle_star', '/particles/star_05.png'); // Sparkle effect for collectibles
-    this.load.image('particle_dust', '/particles/smoke_03.png'); // Dust effect for jump/land
+    // TEMPORARILY DISABLED - Assets not in current build
+    // this.load.image('particle_star', '/particles/star_05.png'); // Sparkle effect for collectibles
+    // this.load.image('particle_dust', '/particles/smoke_03.png'); // Dust effect for jump/land
 
     // Load UI icons
-    this.load.image('ui_star', '/ui/star.png'); // Star icon for score display
+    // TEMPORARILY DISABLED - Asset not in current build
+    // this.load.image('ui_star', '/ui/star.png'); // Star icon for score display
 
     // Load UI button assets (from Kenney UI pack)
     this.load.image('ui_button_rectangle', '/ui/Default/button_rectangle_depth_border.png'); // Main button
@@ -87,6 +83,51 @@ export class BootScene extends Phaser.Scene {
     // FAIL-LOUD ASSET VALIDATION
     this.validateAssets();
 
+    // Create animations from individual frames
+    this.anims.create({
+      key: 'idle',
+      frames: [
+        { key: 'dog_idle_1' },
+        { key: 'dog_idle_2' },
+        { key: 'dog_idle_3' },
+        { key: 'dog_idle_4' },
+      ],
+      frameRate: 8,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: 'walk',
+      frames: [
+        { key: 'dog_walk_1' },
+        { key: 'dog_walk_2' },
+        { key: 'dog_walk_3' },
+      ],
+      frameRate: 10,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: 'jump',
+      frames: [{ key: 'dog_jump' }],
+      frameRate: 1,
+      repeat: 0
+    });
+
+    this.anims.create({
+      key: 'airborne',
+      frames: [{ key: 'dog_airborne' }],
+      frameRate: 1,
+      repeat: 0
+    });
+
+    this.anims.create({
+      key: 'fall',
+      frames: [{ key: 'dog_falling' }],
+      frameRate: 1,
+      repeat: 0
+    });
+
     console.log('✅ Assets loaded and validated');
     console.log('🎮 Starting MenuScene...');
 
@@ -102,27 +143,27 @@ export class BootScene extends Phaser.Scene {
   private validateAssets() {
     // Define manifest of all required texture keys
     const requiredTextures = [
-      'dog_idle',         // Dog idle spritesheet
-      'dog_walk',         // Dog walk spritesheet
-      'dog_jump',         // Dog jump spritesheet
-      'dog_land',         // Dog land spritesheet
+      // Dog animation frames
+      'dog_idle_1', 'dog_idle_2', 'dog_idle_3', 'dog_idle_4',
+      'dog_walk_1', 'dog_walk_2', 'dog_walk_3',
+      'dog_jump', 'dog_airborne', 'dog_falling',
       'menu_background',  // Menu background image
       'bone',             // Bone collectible
       // Parallax background layers
       'bg_sky',           // Sky tile
-      'bg_clouds_far',    // Far clouds
+      // 'bg_clouds_far',  // DISABLED - asset not in current build
       'bg_clouds_near',   // Near clouds
-      'bg_sun',           // Sun decoration
+      // 'bg_sun',         // DISABLED - asset not in current build
       'bg_grass_decor',   // Foreground grass
       // Platform tiles (Kenney pixel platformer)
-      'tile_grass_top',   // Grass top tile
+      // 'tile_grass_top', // DISABLED - path mismatch
       'tile_dirt',        // Dirt tile
       'tile_dirt_alt',    // Dirt variant tile
       // Particle effects
-      'particle_star',    // Sparkle particle
-      'particle_dust',    // Dust particle
+      // 'particle_star',  // DISABLED - asset not in current build
+      // 'particle_dust',  // DISABLED - asset not in current build
       // UI icons
-      'ui_star',          // Star icon
+      // 'ui_star',        // DISABLED - asset not in current build
       // UI buttons and controls
       'ui_button_rectangle', // Rectangle button
       'ui_button_square',    // Square button
@@ -167,7 +208,8 @@ Asset paths should be relative to public root (e.g., '/atlas/dog.png' not '/asse
     const missingAudio: string[] = [];
 
     for (const key of requiredAudio) {
-      if (!this.cache.audio.exists(key)) {
+      // Use sound manager instead of cache - audio might not be in cache yet
+      if (!this.sound.get(key)) {
         missingAudio.push(key);
       }
     }
