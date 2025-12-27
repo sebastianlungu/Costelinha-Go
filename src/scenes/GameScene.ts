@@ -11,7 +11,7 @@ import { Enemy, EnemyDefinition } from '../objects/Enemy';
 import { GroundPatrol } from '../objects/enemies/GroundPatrol';
 import { Hopper } from '../objects/enemies/Hopper';
 import { Flyer } from '../objects/enemies/Flyer';
-import { getLevelDefinition, LevelDefinition, isValidLevelIndex } from '../data/LevelDefinitions';
+import { getLevelDefinition, LevelDefinition, isValidLevelIndex, validateLevelBones } from '../data/LevelDefinitions';
 import { THEME_ASSETS, ThemeId } from '../data/AssetManifest';
 
 interface GameSceneData {
@@ -64,6 +64,10 @@ export class GameScene extends Phaser.Scene {
   // Flag for reachFlag completion goal (level 10)
   private flagSprite?: Phaser.Physics.Arcade.Sprite;
 
+  // Audio system - tracks if AudioContext is truly ready for playback
+  private audioReady: boolean = false;
+  private pendingSounds: Array<{ key: string; volume: number }> = [];
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -114,6 +118,22 @@ export class GameScene extends Phaser.Scene {
     if (this.useLevelDefinition) {
       this.levelDefinition = getLevelDefinition(this.levelIndex);
       console.log(`Loaded level: ${this.levelDefinition.levelName} (${this.levelDefinition.theme})`);
+
+      // Dev-mode validation: Check for level design issues
+      const boneWarnings = validateLevelBones(this.levelDefinition);
+      if (boneWarnings.length > 0) {
+        boneWarnings.forEach(warning => {
+          console.warn(`⚠️ ${warning}`);
+        });
+        // Fail-fast in dev mode: throw on critical issues (duplicate bones)
+        const criticalIssues = boneWarnings.filter(w => w.includes('Duplicate'));
+        if (criticalIssues.length > 0) {
+          throw new Error(`❌ Critical level design issue: ${criticalIssues[0]}`);
+        }
+      }
+
+      // Dev-mode validation: Check bone reachability
+      this.validateBoneReachability(this.levelDefinition);
     }
 
     // Save checkpoint HP for restart functionality
@@ -121,8 +141,8 @@ export class GameScene extends Phaser.Scene {
     gameState.saveLevelCheckpoint();
     this.checkpointHP = gameState.currentHP;
 
-    // Debug: Log audio state when entering GameScene
-    console.log(`🎵 GameScene audio state - locked: ${this.sound.locked}, mute: ${this.sound.mute}, volume: ${this.sound.volume}`);
+    // Initialize audio system with proper unlock handling
+    this.initializeAudio();
 
     // Start game background music (with proper unlock handling)
     this.startGameMusic();
@@ -1312,14 +1332,26 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Starts game music with proper audio unlock handling
+   * Respects gameState volume and mute settings
    */
   private startGameMusic() {
     try {
+      const gameState = getGameState();
+
+      // Check if muted
+      if (gameState.isMuted) {
+        console.log('🎵 Game music skipped (muted)');
+        return;
+      }
+
+      // Apply gameState musicVolume (base volume 0.35 * settings)
+      const musicVolume = 0.35 * gameState.musicVolume;
+
       this.gameMusic = this.sound.add('game_music', {
         loop: true,
-        volume: 0.35,
+        volume: musicVolume,
       });
-      console.log('🎵 Game music object created');
+      console.log(`🎵 Game music object created with volume ${musicVolume.toFixed(2)}`);
 
       // Check if audio is locked
       if (this.sound.locked) {
@@ -1352,12 +1384,130 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Initializes audio system with proper unlock handling for Chrome.
+   * Ensures AudioContext is 'running' before allowing sound playback.
+   */
+  private initializeAudio(): void {
+    const audioContext = (this.sound as any).context as AudioContext | undefined;
+    console.log(`🎵 GameScene audio init - locked: ${this.sound.locked}, context.state: ${audioContext?.state || 'N/A'}`);
+
+    // Check if audio is already ready
+    if (audioContext && audioContext.state === 'running') {
+      console.log('🎵 AudioContext already running');
+      this.setAudioReady();
+      return;
+    }
+
+    // Resume AudioContext if suspended
+    if (audioContext && audioContext.state === 'suspended') {
+      console.log('🎵 AudioContext suspended, attempting resume...');
+      audioContext.resume().then(() => {
+        console.log('🎵 AudioContext resumed successfully');
+        this.setAudioReady();
+      }).catch((err: Error) => {
+        console.warn('🎵 AudioContext resume failed, waiting for interaction:', err);
+      });
+    }
+
+    // Phaser unlock listener
+    if (this.sound.locked) {
+      console.log('🎵 Audio locked, waiting for Phaser unlock...');
+      this.sound.once('unlocked', () => {
+        console.log('🎵 Audio unlocked by Phaser');
+        this.setAudioReady();
+      });
+    }
+
+    // Backup: Listen for first user interaction
+    this.input.once('pointerdown', () => {
+      const ctx = (this.sound as any).context as AudioContext | undefined;
+      if (ctx && ctx.state === 'suspended') {
+        console.log('🎵 First click in GameScene, resuming AudioContext...');
+        ctx.resume().then(() => {
+          console.log('🎵 AudioContext resumed via click');
+          this.setAudioReady();
+        });
+      } else if (ctx && ctx.state === 'running' && !this.audioReady) {
+        this.setAudioReady();
+      }
+    });
+
+    // Also listen for keyboard (jump with space)
+    this.input.keyboard?.once('keydown', () => {
+      const ctx = (this.sound as any).context as AudioContext | undefined;
+      if (ctx && ctx.state === 'suspended') {
+        console.log('🎵 First keypress in GameScene, resuming AudioContext...');
+        ctx.resume().then(() => {
+          console.log('🎵 AudioContext resumed via keypress');
+          this.setAudioReady();
+        });
+      } else if (ctx && ctx.state === 'running' && !this.audioReady) {
+        this.setAudioReady();
+      }
+    });
+  }
+
+  /**
+   * Marks audio as ready and flushes any pending sounds.
+   */
+  private setAudioReady(): void {
+    if (this.audioReady) return; // Already ready
+
+    this.audioReady = true;
+    console.log(`🎵 Audio system READY - flushing ${this.pendingSounds.length} pending sounds`);
+
+    // Flush pending sounds
+    for (const pending of this.pendingSounds) {
+      this.playSound(pending.key, pending.volume);
+    }
+    this.pendingSounds = [];
+  }
+
+  /**
+   * Actually plays a sound (internal, called after audio is ready)
+   */
+  private playSound(key: string, finalVolume: number): void {
+    try {
+      this.sound.play(key, { volume: finalVolume });
+      console.log(`🎵 SFX played: ${key} at volume ${finalVolume.toFixed(2)}`);
+    } catch (e) {
+      console.warn(`⚠️ Could not play SFX ${key}:`, e);
+    }
+  }
+
+  /**
    * Safely attempts to play a sound effect (handles missing audio gracefully)
+   * Respects gameState volume and mute settings.
+   * Queues sounds if audio is not ready yet (Chrome AudioContext issue).
    */
   private tryPlaySound(key: string, volume: number = 1) {
     try {
-      this.sound.play(key, { volume });
-      console.log(`🎵 SFX played: ${key} at volume ${volume}`);
+      const gameState = getGameState();
+
+      // Check if muted
+      if (gameState.isMuted) {
+        console.log(`🎵 SFX skipped (muted): ${key}`);
+        return;
+      }
+
+      // Apply gameState sfxVolume multiplier
+      const finalVolume = volume * gameState.sfxVolume;
+
+      // Skip if effective volume is 0
+      if (finalVolume <= 0) {
+        console.log(`🎵 SFX skipped (zero volume): ${key}`);
+        return;
+      }
+
+      // If audio not ready, queue the sound
+      if (!this.audioReady) {
+        console.log(`🎵 SFX queued (audio not ready): ${key}`);
+        this.pendingSounds.push({ key, volume: finalVolume });
+        return;
+      }
+
+      // Play immediately
+      this.playSound(key, finalVolume);
     } catch (e) {
       console.warn(`⚠️ Could not play SFX ${key}:`, e);
     }
@@ -1452,6 +1602,105 @@ export class GameScene extends Phaser.Scene {
         const dt = 1 / 60;
         this.player.sprite.y += platformVelocity.y * dt;
       }
+    }
+  }
+
+  /**
+   * Validates that all bones in a level are reachable by the player.
+   * A bone is reachable if there's a platform (or player spawn) within jump height below it.
+   *
+   * Physics constants:
+   * - jumpVelocity = 450 (from PLAYER.jumpVelocity, absolute value)
+   * - gravity = 900 (from PHYSICS.gravity)
+   * - Max jump height = v² / (2 * g) = 450² / (2 * 900) = 112.5px
+   *
+   * Heuristic:
+   * - For each bone at (bx, by), check if any platform satisfies:
+   *   1. platform.y >= by (platform is below or at bone level)
+   *   2. platform.y - by <= MAX_JUMP_HEIGHT (within jump reach)
+   *   3. bx is within reasonable horizontal distance of platform (MAX_HORIZONTAL_REACH)
+   * - Also consider player spawn as a valid "platform" for bones near spawn
+   */
+  private validateBoneReachability(levelDef: LevelDefinition): void {
+    const MAX_JUMP_HEIGHT = 112; // v²/2g = 450²/1800 ≈ 112px
+    const MAX_HORIZONTAL_REACH = 400; // Reasonable horizontal distance to reach a bone
+
+    const unreachableBones: Array<{ x: number; y: number; reason: string }> = [];
+
+    // Gather all reachable surfaces (platforms + player spawn)
+    const surfaces: Array<{ x: number; y: number; width: number }> = [
+      // Add player spawn as a point surface
+      { x: levelDef.playerSpawn.x, y: levelDef.playerSpawn.y, width: 50 },
+      // Add all static platforms
+      ...levelDef.platforms.map(p => ({ x: p.x, y: p.y, width: p.width })),
+      // Add moving platforms (at their starting position)
+      ...levelDef.movingPlatforms.map(p => ({ x: p.x, y: p.y, width: p.width })),
+      // Add one-way platforms
+      ...levelDef.oneWayPlatforms.map(p => ({ x: p.x, y: p.y, width: p.width })),
+    ];
+
+    // Check each bone
+    for (const bone of levelDef.bones) {
+      const bx = bone.x;
+      const by = bone.y;
+
+      let isReachable = false;
+      let closestPlatformDistance = Infinity;
+      let closestPlatformY = 0;
+
+      for (const surface of surfaces) {
+        const surfaceY = surface.y;
+        const surfaceLeft = surface.x;
+        const surfaceRight = surface.x + surface.width;
+        const surfaceCenterX = surface.x + surface.width / 2;
+
+        // Check if platform is below or at bone level
+        if (surfaceY < by) {
+          // Platform is above bone - can't jump up from it to reach this bone
+          continue;
+        }
+
+        // Check vertical distance (platform.y - bone.y should be <= MAX_JUMP_HEIGHT)
+        const verticalDistance = surfaceY - by;
+        if (verticalDistance > MAX_JUMP_HEIGHT) {
+          // Track closest for error message
+          if (verticalDistance < closestPlatformDistance) {
+            closestPlatformDistance = verticalDistance;
+            closestPlatformY = surfaceY;
+          }
+          continue;
+        }
+
+        // Check horizontal reachability
+        // Bone should be within MAX_HORIZONTAL_REACH of any point on the platform
+        const horizontalDistanceToLeft = Math.abs(bx - surfaceLeft);
+        const horizontalDistanceToRight = Math.abs(bx - surfaceRight);
+        const horizontalDistanceToCenter = Math.abs(bx - surfaceCenterX);
+        const minHorizontalDistance = Math.min(horizontalDistanceToLeft, horizontalDistanceToRight, horizontalDistanceToCenter);
+
+        // If bone is horizontally within platform bounds or within reach distance
+        if (bx >= surfaceLeft - MAX_HORIZONTAL_REACH && bx <= surfaceRight + MAX_HORIZONTAL_REACH) {
+          isReachable = true;
+          break;
+        }
+      }
+
+      if (!isReachable) {
+        const reason = closestPlatformDistance < Infinity
+          ? `Nearest platform at y=${closestPlatformY} is ${closestPlatformDistance.toFixed(0)}px below (max jump: ${MAX_JUMP_HEIGHT}px)`
+          : 'No platform found below bone';
+        unreachableBones.push({ x: bx, y: by, reason });
+      }
+    }
+
+    // Log results
+    if (unreachableBones.length > 0) {
+      console.warn(`⚠️ Level ${levelDef.levelIndex} (${levelDef.levelName}): ${unreachableBones.length} UNREACHABLE bone(s) detected!`);
+      unreachableBones.forEach(bone => {
+        console.warn(`  ⚠️ Bone at (${bone.x}, ${bone.y}): ${bone.reason}`);
+      });
+    } else {
+      console.log(`✅ Level ${levelDef.levelIndex} (${levelDef.levelName}): All ${levelDef.bones.length} bones are reachable`);
     }
   }
 }

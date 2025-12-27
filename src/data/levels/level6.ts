@@ -66,11 +66,11 @@ export const level6: LevelDefinition = {
 
     // Upper section
     { x: 445, y: 220 },
-    { x: 825, y: 170 },
+    { x: 750, y: 250 },
 
-    // Top platform
-    { x: 580, y: 90 },
-    { x: 700, y: 90 },
+    // Top platform (within jump reach)
+    { x: 580, y: 220 },
+    { x: 700, y: 220 },
   ],
 
   hearts: [

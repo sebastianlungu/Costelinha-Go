@@ -124,7 +124,7 @@ export class MenuScene extends Phaser.Scene {
 
     // Button configuration - smaller, tasteful, centered
     const buttonStartY = CANVAS.height / 2 - 20;
-    const buttonSpacing = 70;
+    const buttonSpacing = 60;
 
     // PLAY button
     this.createButton(
@@ -229,11 +229,29 @@ export class MenuScene extends Phaser.Scene {
 
   /**
    * Safely attempts to play a sound effect
+   * Respects GameState volume and mute settings
    */
   private tryPlaySound(key: string, volume: number = 1) {
     try {
-      this.sound.play(key, { volume });
-      console.log(`🎵 ${key} played`);
+      const gameState = getGameState();
+
+      // Check if muted
+      if (gameState.isMuted) {
+        console.log(`🎵 SFX skipped (muted): ${key}`);
+        return;
+      }
+
+      // Apply gameState sfxVolume multiplier
+      const finalVolume = volume * gameState.sfxVolume;
+
+      // Skip if effective volume is 0
+      if (finalVolume <= 0) {
+        console.log(`🎵 SFX skipped (zero volume): ${key}`);
+        return;
+      }
+
+      this.sound.play(key, { volume: finalVolume });
+      console.log(`🎵 SFX played: ${key} at volume ${finalVolume.toFixed(2)}`);
     } catch (e) {
       console.warn(`⚠️ Could not play ${key}:`, e);
     }
@@ -252,7 +270,7 @@ export class MenuScene extends Phaser.Scene {
 
     // Button background (using Kenney UI asset) - smaller scale
     const buttonBg = this.add.image(0, 0, 'ui_button_rectangle');
-    buttonBg.setScale(2.2); // Smaller scale than before (was 3)
+    buttonBg.setScale(1.8); // Smaller scale for tasteful buttons
     buttonBg.setTint(Phaser.Display.Color.HexStringToColor(UI_COLORS.primary).color);
 
     // Button text - smaller font

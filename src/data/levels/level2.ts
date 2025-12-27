@@ -3,7 +3,7 @@
  *
  * Focus: Alternating left/right platforms going up
  * Introduces: First enemies (1-2 simple GroundPatrol)
- * Goal: Collect all 12 bones
+ * Goal: Collect all 13 bones
  * Theme: Forest - green and lush
  */
 
@@ -40,7 +40,7 @@ export const level2: LevelDefinition = {
   movingPlatforms: [],
   oneWayPlatforms: [],
 
-  // 12 bones - above platforms to encourage jumping
+  // 13 bones - above platforms to encourage jumping (12 + 1 bonus upper right)
   bones: [
     // Ground bones
     { x: 200, y: 620 },
@@ -53,12 +53,15 @@ export const level2: LevelDefinition = {
     { x: 225, y: 370 },
     { x: 475, y: 290 },
     { x: 255, y: 210 },
-    { x: 540, y: 150 },
+    { x: 540, y: 200 },
 
     // Right side platform bones
     { x: 775, y: 490 },
     { x: 1040, y: 420 },
     { x: 1150, y: 620 },
+
+    // Upper right bonus bone (reachable from P8 at y=450)
+    { x: 1100, y: 380 },
   ],
 
   hearts: [],

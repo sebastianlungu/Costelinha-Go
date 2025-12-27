@@ -19,11 +19,11 @@ const DEFAULTS = {
   speed: 60, // Horizontal movement speed
 };
 
-// Animation frames (from tilemap-characters_packed.png)
-// Row 1: Green aliens (frames 9-17)
+// Animation frames (using vacuum spritesheet which has 2 frames)
+// TODO: Create unique flyer sprites when art is available
 const FRAMES = {
-  fly1: 9,
-  fly2: 10,
+  fly1: 0,
+  fly2: 1,
 };
 
 export class Flyer extends Enemy {
@@ -61,11 +61,11 @@ export class Flyer extends Enemy {
     // Flip sprite based on direction
     this.sprite.flipX = this.direction > 0;
 
-    // Create fly animation if it doesn't exist
+    // Create fly animation if it doesn't exist (using vacuum spritesheet)
     if (!scene.anims.exists('flyer_fly')) {
       scene.anims.create({
         key: 'flyer_fly',
-        frames: scene.anims.generateFrameNumbers('enemies', {
+        frames: scene.anims.generateFrameNumbers('vacuum', {
           frames: [FRAMES.fly1, FRAMES.fly2],
         }),
         frameRate: 8,

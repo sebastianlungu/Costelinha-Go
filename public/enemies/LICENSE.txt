@@ -1,0 +1,117 @@
+================================================================================
+COSTELINHA GO - ENEMY ASSETS LICENSE & DOCUMENTATION
+================================================================================
+
+This file documents the licensing and source information for enemy sprites
+used in the Costelinha Go platformer game.
+
+--------------------------------------------------------------------------------
+CURRENT ENEMY ASSETS (Placeholder)
+--------------------------------------------------------------------------------
+
+Source: Kenney.nl "Pixel Platformer" Pack
+License: CC0 1.0 Universal (Public Domain Dedication)
+URL: https://kenney.nl/assets/pixel-platformer
+
+File: /Tilemap/tilemap-characters_packed.png
+- 24x24 pixel sprites, 9 columns x 3 rows
+- Row 0 (frames 0-8): Blue robots - used for GroundPatrol (Vacuum Cleaner)
+- Row 1 (frames 9-17): Green aliens - used for Flyer enemy
+- Row 2 (frames 18-26): Pink creatures - used for Hopper enemy
+
+These sprites are CC0 (public domain) and can be used for any purpose
+without attribution required. However, we credit Kenney.nl as the source.
+
+--------------------------------------------------------------------------------
+TODO: CUSTOM ART NEEDED
+--------------------------------------------------------------------------------
+
+The following custom pixel art sprites are needed to replace placeholders:
+
+1. VACUUM CLEANER (GroundPatrol Enemy)
+   - Current: Blue robot sprite (placeholder)
+   - Needed: 24x24 vacuum cleaner sprite
+   - Style: Roomba-like circular robot
+   - Features:
+     * Gray/silver circular body
+     * Red status light on top
+     * Small wheels visible from side view
+     * Simple antenna or sensor
+   - Animation: 2 frames for walking (slight bounce/movement)
+   - Artist Notes: Keep pixel art consistent with Kenney style
+                   8-bit aesthetic, clean lines, limited palette
+   - Suggested Process:
+     * Create in Aseprite or Piskel (free web-based)
+     * Export as PNG with transparency
+     * Save to /public/enemies/vacuum.png
+
+2. DUST BUNNY (Future Enemy Type)
+   - Currently: Not implemented
+   - Concept: Fluffy dust creature that the vacuum chases
+   - Style: Puffy gray/brown ball with eyes
+   - Could be used as:
+     * Collectible that gives bonus points
+     * Secondary enemy type
+     * Environmental decoration
+
+--------------------------------------------------------------------------------
+PARTICLE EFFECTS
+--------------------------------------------------------------------------------
+
+The vacuum cleaner enemy uses the following particle effect:
+
+Source: Kenney.nl "Particle Pack"
+License: CC0 1.0 Universal (Public Domain)
+URL: https://kenney.nl/assets/particle-pack
+
+File: /particles/smoke_03.png
+- Used as: Dust particles emitted behind vacuum cleaner
+- Loaded as: 'particle_dust' texture key
+- Effect: Creates visual "sucking up dust" appearance
+
+--------------------------------------------------------------------------------
+SUGGESTED FREE ART RESOURCES (CC0/Public Domain)
+--------------------------------------------------------------------------------
+
+For creating or sourcing additional enemy art:
+
+1. Kenney.nl (https://kenney.nl/assets)
+   - Primary source for this project
+   - Extensive CC0 game art library
+   - Consistent pixel art style
+
+2. OpenGameArt.org (https://opengameart.org)
+   - Filter by CC0 license
+   - Community-contributed art
+   - Varying quality/styles
+
+3. itch.io CC0 Assets (https://itch.io/game-assets/free/tag-cc0)
+   - Curated CC0 collections
+   - Many pixel art packs
+
+4. Lospec Palette List (https://lospec.com/palette-list)
+   - For color palette reference
+   - Helps maintain consistent style
+
+--------------------------------------------------------------------------------
+CONTRIBUTING CUSTOM ART
+--------------------------------------------------------------------------------
+
+If creating custom enemy art for this project:
+
+1. License: Must be CC0 or compatible with open-source game
+2. Size: 24x24 pixels (to match existing enemy grid)
+3. Format: PNG with transparency
+4. Style: Match Kenney pixel platformer aesthetic
+5. Palette: Keep colors limited (8-16 colors max)
+6. Animation: Provide 2+ frames for walk/idle cycles
+
+Place new sprites in /public/enemies/ and update:
+- /src/data/AssetManifest.ts - Add to enemies section
+- /src/scenes/BootScene.ts - Add preload call
+- Relevant enemy class in /src/objects/enemies/
+
+================================================================================
+Last Updated: 2025-12-27
+Project: Costelinha Go - Dog Platformer
+================================================================================

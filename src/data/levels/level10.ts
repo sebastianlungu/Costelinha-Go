@@ -85,8 +85,8 @@ export const level10: LevelDefinition = {
     { x: 1025, y: 320 },
     { x: 1190, y: 250 },
     { x: 1010, y: 170 },
-    { x: 1140, y: 120 },
-    { x: 1220, y: 120 },
+    { x: 1100, y: 200 },
+    { x: 1180, y: 200 },
   ],
 
   // Hearts placed strategically for survival

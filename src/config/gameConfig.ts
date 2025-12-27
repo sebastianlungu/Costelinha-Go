@@ -1,9 +1,19 @@
 // gameConfig.ts - Single source of truth for all game constants
 
+// Scale Configuration - responsive scaling bounds
+export const SCALE_CONFIG = {
+  baseWidth: 1280,
+  baseHeight: 720,
+  minWidth: 640,
+  minHeight: 360,
+  maxWidth: 1920,
+  maxHeight: 1080,
+};
+
 // Canvas & World
 export const CANVAS = {
-  width: 1280,
-  height: 720,
+  width: SCALE_CONFIG.baseWidth,
+  height: SCALE_CONFIG.baseHeight,
   backgroundColor: '#87CEEB', // Sky blue
 };
 
@@ -223,7 +233,6 @@ export const UI_COLORS = {
 
   // Secondary colors
   secondary: '#4ECDC4', // Teal (complementary to orange)
-  secondaryDark: '#3DB5AD', // Darker teal
   secondaryLight: '#6FD9D2', // Lighter teal
 
   // Neutral colors
@@ -237,15 +246,12 @@ export const UI_COLORS = {
   textAccent: '#FFD93D', // Yellow for highlights/scores
 
   // UI element colors
-  panelBg: '#2C3E50', // Panel background
   panelBorder: '#FF6B35', // Panel border (primary color)
-  buttonBg: '#FF6B35', // Button background
   buttonHover: '#FF8757', // Button hover state
   buttonText: '#FFFFFF', // Button text
 
   // Status colors
   success: '#6BCF7F', // Green for success/collection
-  warning: '#FFD93D', // Yellow for warnings
   danger: '#E74C3C', // Red for damage/danger
 };
 
@@ -265,50 +271,23 @@ export const UI_TYPOGRAPHY = {
   sizeSmall: '12px', // Small labels, hints
   sizeXS: '8px', // Tiny credits
 
-  // Line heights (tight for pixel fonts)
-  lineHeightTight: 1.2,
-  lineHeightNormal: 1.4,
-  lineHeightRelaxed: 1.6,
 };
 
 // UI Design System - Spacing
 export const UI_SPACING = {
-  // Base spacing unit (8px grid system)
-  unit: 8,
-
   // Specific spacing values
-  xs: 4,
   small: 8,
   medium: 16,
   large: 24,
-  xl: 32,
-  xxl: 48,
-
-  // Padding
-  paddingSmall: 8,
-  paddingMedium: 16,
-  paddingLarge: 24,
-
-  // Margins
-  marginSmall: 8,
-  marginMedium: 16,
-  marginLarge: 24,
 };
 
 // UI Design System - Layout
 export const UI_LAYOUT = {
-  // Border radius (minimal for pixel art aesthetic)
-  borderRadiusSmall: 4,
-  borderRadiusMedium: 8,
-  borderRadiusLarge: 12,
-
   // Border thickness
   borderThin: 2,
   borderMedium: 3,
   borderThick: 4,
 
   // Shadow depths (for 3D button effect)
-  shadowShallow: 2,
   shadowMedium: 4,
-  shadowDeep: 6,
 };

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CANVAS, PHYSICS } from './config/gameConfig';
+import { CANVAS, PHYSICS, SCALE_CONFIG } from './config/gameConfig';
 import { BootScene } from './scenes/BootScene';
 import { MenuScene } from './scenes/MenuScene';
 import { LevelSelectScene } from './scenes/LevelSelectScene';
@@ -18,7 +18,23 @@ const config: Phaser.Types.Core.GameConfig = {
   height: CANVAS.height,
   backgroundColor: CANVAS.backgroundColor,
   parent: 'game',
-  pixelArt: true, // Enable crisp pixel art rendering (nearest-neighbor filtering)
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    min: {
+      width: SCALE_CONFIG.minWidth,
+      height: SCALE_CONFIG.minHeight,
+    },
+    max: {
+      width: SCALE_CONFIG.maxWidth,
+      height: SCALE_CONFIG.maxHeight,
+    },
+  },
+  render: {
+    pixelArt: true,
+    roundPixels: true,
+    antialias: false,
+  },
   audio: {
     // Use WebAudio (default) - it's more reliable and has better features
     // The audio unlock is now handled properly via Phaser's 'unlocked' event in scenes

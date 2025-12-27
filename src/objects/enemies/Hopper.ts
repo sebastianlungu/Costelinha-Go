@@ -17,11 +17,11 @@ const DEFAULTS = {
   jumpInterval: 2000, // Time between jumps in ms
 };
 
-// Animation frames (from tilemap-characters_packed.png)
-// Row 2: Pink creatures (frames 18-26)
+// Animation frames (using vacuum spritesheet which has 2 frames)
+// TODO: Create unique hopper sprites when art is available
 const FRAMES = {
-  idle: 18,
-  jump: 19,
+  idle: 0,
+  jump: 1,
 };
 
 // Hopper states
@@ -55,11 +55,11 @@ export class Hopper extends Enemy {
     // Enable gravity for this enemy
     body.setAllowGravity(true);
 
-    // Create animations if they don't exist
+    // Create animations if they don't exist (using vacuum spritesheet)
     if (!scene.anims.exists('hopper_idle')) {
       scene.anims.create({
         key: 'hopper_idle',
-        frames: scene.anims.generateFrameNumbers('enemies', {
+        frames: scene.anims.generateFrameNumbers('vacuum', {
           frames: [FRAMES.idle],
         }),
         frameRate: 1,
@@ -70,7 +70,7 @@ export class Hopper extends Enemy {
     if (!scene.anims.exists('hopper_jump')) {
       scene.anims.create({
         key: 'hopper_jump',
-        frames: scene.anims.generateFrameNumbers('enemies', {
+        frames: scene.anims.generateFrameNumbers('vacuum', {
           frames: [FRAMES.jump],
         }),
         frameRate: 1,

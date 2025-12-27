@@ -78,10 +78,10 @@ export class HudScene extends Phaser.Scene {
   private createHeartsPanel() {
     const panelX = UI_SPACING.medium;
     const panelY = UI_SPACING.medium;
-    const heartScale = 2.5; // Scale up the 18x18 heart sprites
+    const heartScale = 2.0; // Scale up the 18x18 heart sprites
     const heartSize = 18 * heartScale;
-    const heartSpacing = 4;
-    const panelPadding = UI_SPACING.small;
+    const heartSpacing = 6;
+    const panelPadding = 10; // Slightly more padding
 
     // Calculate panel dimensions
     const panelWidth = (heartSize * this.maxHP) + (heartSpacing * (this.maxHP - 1)) + (panelPadding * 2);
@@ -217,10 +217,10 @@ export class HudScene extends Phaser.Scene {
   private createScorePanel() {
     const panelX = UI_SPACING.medium;
     // Position below hearts panel (hearts panel height + spacing)
-    const heartPanelHeight = (18 * 2.5) + (UI_SPACING.small * 2);
+    const heartPanelHeight = (18 * 2.0) + (10 * 2);
     const panelY = UI_SPACING.medium + heartPanelHeight + UI_SPACING.small;
-    const panelWidth = 160;
-    const panelHeight = 50;
+    const panelWidth = 140;
+    const panelHeight = 44;
 
     // Create container for the entire panel
     this.scorePanelContainer = this.add.container(panelX, panelY);
@@ -342,12 +342,12 @@ export class HudScene extends Phaser.Scene {
         const heart = this.hearts[i];
         this.tweens.add({
           targets: heart,
-          scale: 3.2,
+          scale: 2.6,
           duration: 150,
           yoyo: true,
           ease: 'Back.easeOut',
           onComplete: () => {
-            heart.setScale(2.5);
+            heart.setScale(2.0);
           }
         });
       }

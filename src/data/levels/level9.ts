@@ -80,7 +80,7 @@ export const level9: LevelDefinition = {
     { x: 1010, y: 490 },
 
     // End area
-    { x: 1180, y: 420 },
+    { x: 1180, y: 500 },
     { x: 1165, y: 620 },
     { x: 1100, y: 620 },
   ],

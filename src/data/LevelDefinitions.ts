@@ -172,3 +172,68 @@ export const LEVEL_CANVAS = {
   height: 720,
   groundY: 650, // Standard ground level
 };
+
+// =============================================================================
+// DEV-MODE VALIDATION
+// =============================================================================
+
+/**
+ * Expected bone counts per level (for validation)
+ * Update these when intentionally changing bone counts
+ */
+const EXPECTED_BONE_COUNTS: Record<number, number> = {
+  2: 13, // Level 2: 13 bones (12 original + 1 bonus upper right)
+};
+
+/**
+ * Validates level bones for common issues.
+ * Call in dev mode to catch level design errors early.
+ *
+ * Checks:
+ * - Bone count matches expected (if defined)
+ * - No bones out of bounds (x: 0-1280, y: 0-720)
+ * - No duplicate bone positions
+ *
+ * @param level - The level definition to validate
+ * @returns Array of warning strings (empty if no issues)
+ */
+export function validateLevelBones(level: LevelDefinition): string[] {
+  const warnings: string[] = [];
+  const levelName = `Level ${level.levelIndex} (${level.levelName})`;
+
+  // Check bone count matches expected (if we have an expected count)
+  const expectedCount = EXPECTED_BONE_COUNTS[level.levelIndex];
+  if (expectedCount !== undefined && level.bones.length !== expectedCount) {
+    warnings.push(
+      `${levelName}: Expected ${expectedCount} bones, found ${level.bones.length}`
+    );
+  }
+
+  // Check for out-of-bounds bones
+  level.bones.forEach((bone, index) => {
+    if (bone.x < 0 || bone.x > LEVEL_CANVAS.width) {
+      warnings.push(
+        `${levelName}: Bone ${index} has out-of-bounds X position: ${bone.x} (valid: 0-${LEVEL_CANVAS.width})`
+      );
+    }
+    if (bone.y < 0 || bone.y > LEVEL_CANVAS.height) {
+      warnings.push(
+        `${levelName}: Bone ${index} has out-of-bounds Y position: ${bone.y} (valid: 0-${LEVEL_CANVAS.height})`
+      );
+    }
+  });
+
+  // Check for duplicate bone positions
+  const positionSet = new Set<string>();
+  level.bones.forEach((bone, index) => {
+    const key = `${bone.x},${bone.y}`;
+    if (positionSet.has(key)) {
+      warnings.push(
+        `${levelName}: Duplicate bone position at (${bone.x}, ${bone.y}) - bone ${index}`
+      );
+    }
+    positionSet.add(key);
+  });
+
+  return warnings;
+}

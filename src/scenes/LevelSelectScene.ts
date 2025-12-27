@@ -3,7 +3,6 @@ import {
   CANVAS,
   UI_COLORS,
   UI_TYPOGRAPHY,
-  UI_SPACING,
   UI_LAYOUT,
 } from '../config/gameConfig';
 import { getGameState } from '../state/GameState';
@@ -98,12 +97,12 @@ export class LevelSelectScene extends Phaser.Scene {
     const gridConfig = {
       cols: 5,
       rows: 2,
-      cellWidth: 180,
-      cellHeight: 180,
-      startX: CANVAS.width / 2 - (5 * 180) / 2 + 90, // Center grid
+      cellWidth: 160,
+      cellHeight: 160,
+      startX: CANVAS.width / 2 - (5 * 160) / 2 + 80, // Center grid
       startY: 180,
       gapX: 20,
-      gapY: 40,
+      gapY: 30,
     };
 
     for (let i = 0; i < LEVEL_INFO.length; i++) {
@@ -250,7 +249,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
     // Button background
     const bg = this.add.image(0, 0, 'ui_button_rectangle');
-    bg.setScale(2);
+    bg.setScale(1.8);
     bg.setTint(Phaser.Display.Color.HexStringToColor(UI_COLORS.secondary).color);
 
     // Button text
@@ -288,14 +287,29 @@ export class LevelSelectScene extends Phaser.Scene {
 
   /**
    * Safely play a sound effect
+   * Respects GameState volume and mute settings
    */
   private tryPlaySound(key: string, volume: number = 1): void {
     try {
       const gameState = getGameState();
-      const adjustedVolume = volume * gameState.sfxVolume;
-      if (adjustedVolume > 0) {
-        this.sound.play(key, { volume: adjustedVolume });
+
+      // Check if muted
+      if (gameState.isMuted) {
+        console.log(`🎵 SFX skipped (muted): ${key}`);
+        return;
       }
+
+      // Apply gameState sfxVolume multiplier
+      const finalVolume = volume * gameState.sfxVolume;
+
+      // Skip if effective volume is 0
+      if (finalVolume <= 0) {
+        console.log(`🎵 SFX skipped (zero volume): ${key}`);
+        return;
+      }
+
+      this.sound.play(key, { volume: finalVolume });
+      console.log(`🎵 SFX played: ${key} at volume ${finalVolume.toFixed(2)}`);
     } catch (e) {
       console.warn(`⚠️ Could not play ${key}:`, e);
     }

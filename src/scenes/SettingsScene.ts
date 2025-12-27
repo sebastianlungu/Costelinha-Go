@@ -3,7 +3,6 @@ import {
   CANVAS,
   UI_COLORS,
   UI_TYPOGRAPHY,
-  UI_SPACING,
   UI_LAYOUT,
 } from '../config/gameConfig';
 import { getGameState } from '../state/GameState';
@@ -126,9 +125,9 @@ export class SettingsScene extends Phaser.Scene {
   ): { container: Phaser.GameObjects.Container; updateValue: (val: number) => void } {
     const container = this.add.container(x, y);
 
-    const sliderWidth = 400;
+    const sliderWidth = 320;
     const sliderHeight = 20;
-    const handleSize = 30;
+    const handleSize = 24;
     const labelOffsetX = -220;
 
     // Label
@@ -370,7 +369,7 @@ export class SettingsScene extends Phaser.Scene {
 
     // Button background
     const bg = this.add.image(0, 0, 'ui_button_rectangle');
-    bg.setScale(2.5);
+    bg.setScale(1.8);
     bg.setTint(Phaser.Display.Color.HexStringToColor(UI_COLORS.secondary).color);
 
     // Button text
@@ -424,16 +423,29 @@ export class SettingsScene extends Phaser.Scene {
 
   /**
    * Safely play a sound effect
+   * Respects GameState volume and mute settings
    */
   private tryPlaySound(key: string, volume: number = 1): void {
     try {
       const gameState = getGameState();
-      if (!gameState.isMuted) {
-        const adjustedVolume = volume * gameState.sfxVolume;
-        if (adjustedVolume > 0) {
-          this.sound.play(key, { volume: adjustedVolume });
-        }
+
+      // Check if muted
+      if (gameState.isMuted) {
+        console.log(`🎵 SFX skipped (muted): ${key}`);
+        return;
       }
+
+      // Apply gameState sfxVolume multiplier
+      const finalVolume = volume * gameState.sfxVolume;
+
+      // Skip if effective volume is 0
+      if (finalVolume <= 0) {
+        console.log(`🎵 SFX skipped (zero volume): ${key}`);
+        return;
+      }
+
+      this.sound.play(key, { volume: finalVolume });
+      console.log(`🎵 SFX played: ${key} at volume ${finalVolume.toFixed(2)}`);
     } catch (e) {
       console.warn(`⚠️ Could not play ${key}:`, e);
     }

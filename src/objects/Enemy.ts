@@ -58,8 +58,8 @@ export abstract class Enemy extends Phaser.Events.EventEmitter {
     this.startX = x;
     this.startY = y;
 
-    // Create sprite with physics using the enemies spritesheet
-    this.sprite = scene.physics.add.sprite(x, y, 'enemies', frame);
+    // Create sprite with physics using the vacuum spritesheet (generated in BootScene)
+    this.sprite = scene.physics.add.sprite(x, y, 'vacuum', frame);
 
     // Scale up the 24x24 sprites for visibility
     this.sprite.setScale(2);

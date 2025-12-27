@@ -64,14 +64,8 @@ export class BootScene extends Phaser.Scene {
       frameHeight: 18,
     });
 
-    // Load enemy sprites (24x24 tiles, 9 columns, 3 rows)
-    // Row 0: Blue robots (frames 0-8) - used for GroundPatrol
-    // Row 1: Green aliens (frames 9-17) - used for Flyer
-    // Row 2: Pink creatures (frames 18-26) - used for Hopper
-    this.load.spritesheet('enemies', '/Tilemap/tilemap-characters_packed.png', {
-      frameWidth: 24,
-      frameHeight: 24,
-    });
+    // Enemy sprites are generated programmatically in create() to avoid
+    // external asset dependency issues. See createVacuumSprite() method.
 
     // Load audio assets
     console.log('🎵 Loading audio assets...');
@@ -97,6 +91,9 @@ export class BootScene extends Phaser.Scene {
   create() {
     // Mark assets as loaded (Phaser calls create after preload completes)
     this.assetsLoaded = true;
+
+    // Generate vacuum enemy sprite programmatically (avoids external asset dependency)
+    this.createVacuumSprite();
 
     // FAIL-LOUD ASSET VALIDATION
     this.validateAssets();
@@ -245,8 +242,7 @@ export class BootScene extends Phaser.Scene {
       'ui_arrow_right',      // Right arrow
       // Tilemap for hearts
       'tilemap_packed',      // Tilemap with heart sprites
-      // Enemy sprites
-      'enemies',             // Enemy character spritesheet
+      // Note: 'vacuum' enemy sprite is generated programmatically in create()
     ];
 
     // Check each required texture exists in cache
@@ -270,6 +266,130 @@ Asset paths should be relative to public root (e.g., '/atlas/dog.png' not '/asse
     }
 
     console.log('✅ Asset validation passed - all required textures loaded');
-    console.log('🎵 Audio files loaded (will be available after Web Audio unlock)');
+
+    // Log audio system state for debugging Chrome audio issues
+    const audioContext = (this.sound as any).context as AudioContext | undefined;
+    console.log(`🎵 Audio system ready - locked: ${this.sound.locked}, context.state: ${audioContext?.state || 'N/A'}`);
+
+    // Log loaded audio files
+    const audioKeys = ['menu_music', 'game_music', 'jump_sfx', 'land_sfx', 'collect_sfx', 'ui_click_sfx', 'win_sfx'];
+    const loadedAudio = audioKeys.filter(key => this.cache.audio.exists(key));
+    const missingAudio = audioKeys.filter(key => !this.cache.audio.exists(key));
+
+    if (loadedAudio.length > 0) {
+      console.log(`🎵 Audio files loaded: ${loadedAudio.join(', ')}`);
+    }
+    if (missingAudio.length > 0) {
+      console.warn(`⚠️ Audio files missing: ${missingAudio.join(', ')}`);
+    }
+
+    console.log('🎵 Audio will unlock on first user interaction (Chrome policy)');
+  }
+
+  /**
+   * Creates a vacuum cleaner sprite programmatically using canvas.
+   * This generates a 48x24 spritesheet with 2 frames for walk animation.
+   *
+   * SPRITE LICENSE: Created in-house for this project (Costelinha Go).
+   * Free to use/modify within this project.
+   *
+   * Design: Roomba-style circular vacuum cleaner
+   * - Frame 0: Wheels at neutral position
+   * - Frame 1: Wheels slightly rotated (animation)
+   */
+  private createVacuumSprite(): void {
+    const frameWidth = 24;
+    const frameHeight = 24;
+    const totalWidth = frameWidth * 2; // 2 frames side by side
+
+    // Create a canvas to draw the vacuum sprite
+    const canvas = document.createElement('canvas');
+    canvas.width = totalWidth;
+    canvas.height = frameHeight;
+    const ctx = canvas.getContext('2d')!;
+
+    // Draw both frames
+    for (let frame = 0; frame < 2; frame++) {
+      const offsetX = frame * frameWidth;
+
+      // Clear frame area
+      ctx.clearRect(offsetX, 0, frameWidth, frameHeight);
+
+      // Vacuum body (Roomba-style circular design)
+      // Main body - dark gray circle
+      ctx.fillStyle = '#4a4a4a';
+      ctx.beginPath();
+      ctx.arc(offsetX + 12, 12, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Body highlight - lighter gray arc on top
+      ctx.fillStyle = '#6a6a6a';
+      ctx.beginPath();
+      ctx.arc(offsetX + 12, 10, 7, Math.PI, 0);
+      ctx.fill();
+
+      // Red status light on top
+      ctx.fillStyle = frame === 0 ? '#ff3333' : '#ff6666'; // Blink between frames
+      ctx.beginPath();
+      ctx.arc(offsetX + 12, 6, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Light glow effect
+      ctx.fillStyle = frame === 0 ? '#ff666644' : '#ff999944';
+      ctx.beginPath();
+      ctx.arc(offsetX + 12, 6, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Suction inlet (dark area at front)
+      ctx.fillStyle = '#2a2a2a';
+      ctx.beginPath();
+      ctx.arc(offsetX + 18, 12, 3, -Math.PI / 2, Math.PI / 2);
+      ctx.fill();
+
+      // Wheels - two small circles at bottom
+      ctx.fillStyle = '#333333';
+      const wheelOffset = frame === 0 ? 0 : 1; // Slight movement between frames
+
+      // Left wheel
+      ctx.beginPath();
+      ctx.arc(offsetX + 6, 19 + wheelOffset, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Right wheel
+      ctx.beginPath();
+      ctx.arc(offsetX + 18, 19 - wheelOffset, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Wheel details (spokes/treads)
+      ctx.strokeStyle = '#555555';
+      ctx.lineWidth = 1;
+
+      // Left wheel spoke
+      ctx.beginPath();
+      ctx.moveTo(offsetX + 4, 19 + wheelOffset);
+      ctx.lineTo(offsetX + 8, 19 + wheelOffset);
+      ctx.stroke();
+
+      // Right wheel spoke
+      ctx.beginPath();
+      ctx.moveTo(offsetX + 16, 19 - wheelOffset);
+      ctx.lineTo(offsetX + 20, 19 - wheelOffset);
+      ctx.stroke();
+
+      // Outer ring detail
+      ctx.strokeStyle = '#3a3a3a';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(offsetX + 12, 12, 9, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Add the canvas as a spritesheet texture
+    this.textures.addSpriteSheet('vacuum', canvas, {
+      frameWidth: frameWidth,
+      frameHeight: frameHeight,
+    });
+
+    console.log('🎨 Vacuum sprite generated programmatically (2 frames, 24x24 each)');
   }
 }
