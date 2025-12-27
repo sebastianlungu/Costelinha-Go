@@ -66,8 +66,8 @@ export const level10: LevelDefinition = {
   bones: [
     // Starting section
     { x: 100, y: 620 },
-    { x: 300, y: 550 },
-    { x: 450, y: 490 },
+    { x: 300, y: 500 },
+    { x: 450, y: 440 },
     { x: 600, y: 430 },
 
     // Central arena
@@ -82,8 +82,8 @@ export const level10: LevelDefinition = {
     { x: 820, y: 220 },
 
     // Final ascent
-    { x: 1025, y: 320 },
-    { x: 1190, y: 250 },
+    { x: 1025, y: 270 },
+    { x: 1190, y: 190 },
     { x: 1010, y: 170 },
     { x: 1100, y: 200 },
     { x: 1180, y: 200 },

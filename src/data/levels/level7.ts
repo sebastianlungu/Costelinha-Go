@@ -63,11 +63,11 @@ export const level7: LevelDefinition = {
     { x: 480, y: 220 },
 
     // Central area
-    { x: 590, y: 520 },
-    { x: 700, y: 370 },
+    { x: 520, y: 520 },
+    { x: 700, y: 320 },
 
     // One-way section
-    { x: 830, y: 520 },
+    { x: 830, y: 470 },
     { x: 855, y: 420 },
     { x: 800, y: 320 },
 

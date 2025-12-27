@@ -7,6 +7,7 @@ import {
 } from '../config/gameConfig';
 import { getGameState } from '../state/GameState';
 import { ThemeId } from '../data/AssetManifest';
+import { AudioManager } from '../systems/AudioManager';
 
 // Level data for display
 interface LevelDisplayInfo {
@@ -301,17 +302,7 @@ export class LevelSelectScene extends Phaser.Scene {
         return;
       }
 
-      // Apply gameState sfxVolume multiplier
-      const finalVolume = volume * gameState.sfxVolume;
-
-      // Skip if effective volume is 0
-      if (finalVolume <= 0) {
-        console.log(`🎵 SFX skipped (zero volume): ${key}`);
-        return;
-      }
-
-      const played = this.sound.play(key, { volume: finalVolume });
-      console.log(`SFX play() called: ${key} played=${played} effectiveVolume=${finalVolume.toFixed(2)}`);
+      AudioManager.playSfx(key, volume);
     } catch (e) {
       console.warn(`⚠️ Could not play ${key}:`, e);
     }

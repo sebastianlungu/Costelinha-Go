@@ -6,6 +6,7 @@ import { Heart } from '../objects/Heart';
 import { MovingPlatform } from '../objects/MovingPlatform';
 import { OneWayPlatform } from '../objects/OneWayPlatform';
 import { Score } from '../systems/Score';
+import { AudioManager } from '../systems/AudioManager';
 import { getGameState } from '../state/GameState';
 import { Enemy, EnemyDefinition } from '../objects/Enemy';
 import { GroundPatrol } from '../objects/enemies/GroundPatrol';
@@ -38,7 +39,6 @@ export class GameScene extends Phaser.Scene {
   private isDebugEnabled: boolean = false;
   private sparkleEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private dustEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
-  private gameMusic?: Phaser.Sound.BaseSound;
   private lastLandSoundTime: number = 0;
   private landSoundThrottle: number = 200; // Minimum ms between land sounds
 
@@ -64,10 +64,6 @@ export class GameScene extends Phaser.Scene {
 
   // Flag for reachFlag completion goal (level 10)
   private flagSprite?: Phaser.Physics.Arcade.Sprite;
-
-  // Audio system - tracks if AudioContext is truly ready for playback
-  private audioReady: boolean = false;
-  private pendingSounds: Array<{ key: string; volume: number }> = [];
 
   constructor() {
     super({ key: 'GameScene' });
@@ -141,9 +137,6 @@ export class GameScene extends Phaser.Scene {
     const gameState = getGameState();
     gameState.saveLevelCheckpoint();
     this.checkpointHP = gameState.currentHP;
-
-    // Initialize audio system with proper unlock handling
-    this.initializeAudio();
 
     // Start game background music (with proper unlock handling)
     this.startGameMusic();
@@ -581,13 +574,15 @@ export class GameScene extends Phaser.Scene {
     });
 
     if (overlaps.length > 0) {
+      const lines = overlaps.map((overlap) => (
+        `bone[${overlap.boneIndex}] (${overlap.boneX}, ${overlap.boneY}) ` +
+        `enemy[${overlap.enemyIndex}] ${overlap.enemyType} (${overlap.enemyX}, ${overlap.enemyY})`
+      ));
       console.warn(`Bone/enemy overlaps detected at spawn (${levelLabel}): ${overlaps.length}`);
-      overlaps.forEach((overlap) => {
-        console.warn(
-          `  overlap bone[${overlap.boneIndex}] (${overlap.boneX}, ${overlap.boneY}) ` +
-          `enemy[${overlap.enemyIndex}] ${overlap.enemyType} (${overlap.enemyX}, ${overlap.enemyY})`
-        );
-      });
+      lines.forEach((line) => console.warn(`  overlap ${line}`));
+      if (import.meta.env.DEV) {
+        throw new Error(`Bone/enemy overlaps detected at spawn (${levelLabel}): ${lines.join(' | ')}`);
+      }
     } else {
       console.log(`No bone/enemy overlaps detected at spawn (${levelLabel})`);
     }
@@ -690,9 +685,7 @@ export class GameScene extends Phaser.Scene {
     this.player.sprite.setAcceleration(0, 0);
 
     // Stop game music
-    if (this.gameMusic) {
-      this.gameMusic.stop();
-    }
+    AudioManager.stopMusic();
 
     // Show game over overlay after a short delay
     this.time.delayedCall(500, () => {
@@ -1057,15 +1050,13 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private checkWinCondition(score: number) {
+  private checkWinCondition(bonesCollected: number, bonesTotal: number) {
     // Only check for collectAllBones goal
     if (this.levelDefinition?.completionGoal === 'reachFlag') {
       return; // Flag completion is handled separately
     }
 
-    const totalBones = this.levelDefinition ? this.levelDefinition.bones.length : COLLECTIBLES.count;
-
-    if (score >= totalBones && !this.isGameWon) {
+    if (bonesCollected === bonesTotal && !this.isGameWon) {
       this.isGameWon = true;
       this.showLevelCompleteOverlay();
       console.log('All bones collected! Level complete!');
@@ -1099,9 +1090,7 @@ export class GameScene extends Phaser.Scene {
    */
   private showLevelCompleteOverlay(): void {
     // Stop game music
-    if (this.gameMusic) {
-      this.gameMusic.stop();
-    }
+    AudioManager.stopMusic();
 
     this.tryPlaySound('win_sfx', 0.8);
 
@@ -1370,10 +1359,7 @@ export class GameScene extends Phaser.Scene {
     console.log('🎮 Restarting game...');
 
     // Stop game music before restart
-    if (this.gameMusic) {
-      this.gameMusic.stop();
-      console.log('🎵 Game music stopped for restart');
-    }
+    AudioManager.stopMusic();
 
     // Stop HudScene
     this.scene.stop('HudScene');
@@ -1409,145 +1395,7 @@ export class GameScene extends Phaser.Scene {
    * Respects gameState volume and mute settings
    */
   private startGameMusic() {
-    try {
-      const gameState = getGameState();
-
-      // Check if muted
-      if (gameState.isMuted) {
-        console.log('🎵 Game music skipped (muted)');
-        return;
-      }
-
-      // Apply gameState musicVolume (base volume 0.35 * settings)
-      const musicVolume = 0.35 * gameState.musicVolume;
-
-      this.gameMusic = this.sound.add('game_music', {
-        loop: true,
-        volume: musicVolume,
-      });
-      console.log(`🎵 Game music object created with volume ${musicVolume.toFixed(2)}`);
-
-      // Check if audio is locked
-      if (this.sound.locked) {
-        console.log('🎵 Audio still locked in GameScene, waiting for unlock...');
-        this.sound.once('unlocked', () => {
-          console.log('🎵 Audio unlocked in GameScene, starting music');
-          this.tryPlayGameMusic();
-        });
-      } else {
-        // Audio already unlocked (normal case after menu interaction)
-        console.log('🎵 Audio unlocked, starting game music immediately');
-        this.tryPlayGameMusic();
-      }
-    } catch (e) {
-      console.warn('⚠️ Could not create game music:', e);
-      this.gameMusic = undefined;
-    }
-  }
-
-  /**
-   * Attempts to play game music with debug logging
-   */
-  private tryPlayGameMusic() {
-    if (this.gameMusic && !this.gameMusic.isPlaying) {
-      this.gameMusic.play();
-      console.log(`🎵 Game music play() called - isPlaying: ${this.gameMusic.isPlaying}`);
-    } else if (this.gameMusic?.isPlaying) {
-      console.log('🎵 Game music already playing');
-    }
-  }
-
-  /**
-   * Initializes audio system with proper unlock handling for Chrome.
-   * Ensures AudioContext is 'running' before allowing sound playback.
-   */
-  private initializeAudio(): void {
-    const audioContext = (this.sound as any).context as AudioContext | undefined;
-    console.log(`🎵 GameScene audio init - locked: ${this.sound.locked}, context.state: ${audioContext?.state || 'N/A'}`);
-
-    // Check if audio is already ready
-    if (audioContext && audioContext.state === 'running') {
-      console.log('🎵 AudioContext already running');
-      this.setAudioReady();
-      return;
-    }
-
-    // Resume AudioContext if suspended
-    if (audioContext && audioContext.state === 'suspended') {
-      console.log('🎵 AudioContext suspended, attempting resume...');
-      audioContext.resume().then(() => {
-        console.log('🎵 AudioContext resumed successfully');
-        this.setAudioReady();
-      }).catch((err: Error) => {
-        console.warn('🎵 AudioContext resume failed, waiting for interaction:', err);
-      });
-    }
-
-    // Phaser unlock listener
-    if (this.sound.locked) {
-      console.log('🎵 Audio locked, waiting for Phaser unlock...');
-      this.sound.once('unlocked', () => {
-        console.log('🎵 Audio unlocked by Phaser');
-        this.setAudioReady();
-      });
-    }
-
-    // Backup: Listen for first user interaction
-    this.input.once('pointerdown', () => {
-      const ctx = (this.sound as any).context as AudioContext | undefined;
-      if (ctx && ctx.state === 'suspended') {
-        console.log('🎵 First click in GameScene, resuming AudioContext...');
-        ctx.resume().then(() => {
-          console.log('🎵 AudioContext resumed via click');
-          this.setAudioReady();
-        });
-      } else if (ctx && ctx.state === 'running' && !this.audioReady) {
-        this.setAudioReady();
-      }
-    });
-
-    // Also listen for keyboard (jump with space)
-    this.input.keyboard?.once('keydown', () => {
-      const ctx = (this.sound as any).context as AudioContext | undefined;
-      if (ctx && ctx.state === 'suspended') {
-        console.log('🎵 First keypress in GameScene, resuming AudioContext...');
-        ctx.resume().then(() => {
-          console.log('🎵 AudioContext resumed via keypress');
-          this.setAudioReady();
-        });
-      } else if (ctx && ctx.state === 'running' && !this.audioReady) {
-        this.setAudioReady();
-      }
-    });
-  }
-
-  /**
-   * Marks audio as ready and flushes any pending sounds.
-   */
-  private setAudioReady(): void {
-    if (this.audioReady) return; // Already ready
-
-    this.audioReady = true;
-    console.log(`🎵 Audio system READY - flushing ${this.pendingSounds.length} pending sounds`);
-
-    // Flush pending sounds
-    for (const pending of this.pendingSounds) {
-      this.playSound(pending.key, pending.volume);
-    }
-    this.pendingSounds = [];
-  }
-
-  /**
-   * Actually plays a sound (internal, called after audio is ready)
-   */
-  private playSound(key: string, finalVolume: number): void {
-    try {
-      const cacheExists = this.cache.audio.exists(key);
-      const played = this.sound.play(key, { volume: finalVolume });
-      console.log(`SFX play() called: ${key} played=${played} cache=${cacheExists} locked=${this.sound.locked} mute=${this.sound.mute} volume=${this.sound.volume.toFixed(2)} effectiveVolume=${finalVolume.toFixed(2)}`);
-    } catch (e) {
-      console.warn(`⚠️ Could not play SFX ${key}:`, e);
-    }
+    AudioManager.playMusic('game_music', 0.35, true);
   }
 
   /**
@@ -1567,24 +1415,7 @@ export class GameScene extends Phaser.Scene {
         return;
       }
 
-      // Apply gameState sfxVolume multiplier
-      const finalVolume = volume * gameState.sfxVolume;
-
-      // Skip if effective volume is 0
-      if (finalVolume <= 0) {
-        console.log(`🎵 SFX skipped (zero volume): ${key}`);
-        return;
-      }
-
-      // If audio not ready, queue the sound
-      if (!this.audioReady) {
-        console.log(`🎵 SFX queued (audio not ready): ${key}`);
-        this.pendingSounds.push({ key, volume: finalVolume });
-        return;
-      }
-
-      // Play immediately
-      this.playSound(key, finalVolume);
+      AudioManager.playSfx(key, volume);
     } catch (e) {
       console.warn(`⚠️ Could not play SFX ${key}:`, e);
     }

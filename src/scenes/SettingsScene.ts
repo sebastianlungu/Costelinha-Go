@@ -6,6 +6,7 @@ import {
   UI_LAYOUT,
 } from '../config/gameConfig';
 import { getGameState } from '../state/GameState';
+import { AudioManager } from '../systems/AudioManager';
 
 // Slider step configuration (5 discrete steps: 0%, 25%, 50%, 75%, 100%)
 const VOLUME_STEPS = [0, 0.25, 0.5, 0.75, 1.0];
@@ -418,6 +419,7 @@ export class SettingsScene extends Phaser.Scene {
     // The global volume affects all sounds equally
     // For granular control, we apply volumes when playing each sound
 
+    AudioManager.updateMusicVolume();
     console.log(`🎵 Audio settings applied - Mute: ${gameState.isMuted}, Music: ${gameState.musicVolume}, SFX: ${gameState.sfxVolume}`);
   }
 
@@ -437,17 +439,7 @@ export class SettingsScene extends Phaser.Scene {
         return;
       }
 
-      // Apply gameState sfxVolume multiplier
-      const finalVolume = volume * gameState.sfxVolume;
-
-      // Skip if effective volume is 0
-      if (finalVolume <= 0) {
-        console.log(`🎵 SFX skipped (zero volume): ${key}`);
-        return;
-      }
-
-      const played = this.sound.play(key, { volume: finalVolume });
-      console.log(`SFX play() called: ${key} played=${played} effectiveVolume=${finalVolume.toFixed(2)}`);
+      AudioManager.playSfx(key, volume);
     } catch (e) {
       console.warn(`⚠️ Could not play ${key}:`, e);
     }

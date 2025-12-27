@@ -55,13 +55,13 @@ export const level6: LevelDefinition = {
     { x: 730, y: 620 },
 
     // Lower section
-    { x: 425, y: 520 },
+    { x: 425, y: 470 },
     { x: 855, y: 470 },
     { x: 590, y: 450 },
 
     // Middle section
     { x: 390, y: 370 },
-    { x: 890, y: 320 },
+    { x: 890, y: 270 },
     { x: 610, y: 290 },
 
     // Upper section

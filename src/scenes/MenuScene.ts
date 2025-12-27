@@ -5,11 +5,11 @@ import {
   UI_TYPOGRAPHY,
 } from '../config/gameConfig';
 import { getGameState } from '../state/GameState';
+import { AudioManager } from '../systems/AudioManager';
 
 export class MenuScene extends Phaser.Scene {
-  private menuMusic?: Phaser.Sound.BaseSound;
-  private isAudioUnlocked: boolean = false;
   private buttons: Phaser.GameObjects.Container[] = [];
+  private backgroundVideo?: Phaser.GameObjects.Video;
 
   constructor() {
     super({ key: 'MenuScene' });
@@ -20,65 +20,41 @@ export class MenuScene extends Phaser.Scene {
 
     // Debug: Log initial audio state
     console.log(`🎵 Audio system state - locked: ${this.sound.locked}, mute: ${this.sound.mute}, volume: ${this.sound.volume}`);
+    console.log(`[AudioManager] ${AudioManager.getDebugInfo()}`);
 
-    // Try to create menu music (may fail if audio didn't load due to browser restrictions)
-    try {
-      this.menuMusic = this.sound.add('menu_music', {
-        loop: true,
-        volume: 0.3,
-      });
-      console.log('🎵 Menu music created successfully');
-    } catch (e) {
-      console.warn('⚠️ Could not create menu music - audio may not be available:', e);
-      this.menuMusic = undefined;
-    }
+    // Queue menu music (AudioManager will defer until unlocked)
+    AudioManager.playMusic('menu_music', 0.3, true);
 
-    // Handle audio unlock properly using Phaser's recommended pattern
-    if (this.sound.locked) {
-      console.log('🎵 Audio is locked, waiting for user gesture to unlock...');
-      this.sound.once('unlocked', () => {
-        console.log('🎵 Audio unlocked by Phaser!');
-        this.isAudioUnlocked = true;
-        this.tryPlayMenuMusic();
-      });
-    } else {
-      console.log('🎵 Audio already unlocked, playing immediately');
-      this.isAudioUnlocked = true;
-      this.tryPlayMenuMusic();
-    }
-
-    // Also add pointerdown as backup unlock trigger
+    // Single unlock pathway: first user gesture in Menu
     this.input.once('pointerdown', () => {
       console.log('🎵 First click detected - attempting audio unlock');
-      if (!this.isAudioUnlocked) {
-        if (this.sound.context && this.sound.context.state === 'suspended') {
-          console.log('🎵 Audio context suspended, resuming...');
-          this.sound.context.resume().then(() => {
-            console.log('🎵 Audio context resumed successfully');
-            this.isAudioUnlocked = true;
-            this.tryPlayMenuMusic();
-          }).catch((err: Error) => {
-            console.warn('⚠️ Failed to resume audio context:', err);
-          });
-        } else {
-          this.isAudioUnlocked = true;
-          this.tryPlayMenuMusic();
-        }
-      }
+      AudioManager.tryUnlock();
     });
 
-    // Display menu background scaled to fit 1280x720 canvas
-    const background = this.add.image(
+    this.input.keyboard?.once('keydown', () => {
+      console.log('🎵 First keypress detected - attempting audio unlock');
+      AudioManager.tryUnlock();
+    });
+
+    // Display menu background video (looped, muted)
+    // Video is 1504x832, canvas is 1280x720
+    this.backgroundVideo = this.add.video(
       CANVAS.width / 2,
       CANVAS.height / 2,
-      'menu_background'
+      'menu_background_video'
     );
 
-    // Scale background to cover canvas (1920x1080 -> 1280x720)
-    const scaleX = CANVAS.width / background.width;
-    const scaleY = CANVAS.height / background.height;
-    const scale = Math.max(scaleX, scaleY);
-    background.setScale(scale);
+    // Scale video to fit canvas (use known video dimensions)
+    const videoWidth = 1504;
+    const videoHeight = 832;
+    const scaleX = CANVAS.width / videoWidth;
+    const scaleY = CANVAS.height / videoHeight;
+    const scale = Math.min(scaleX, scaleY); // Fit (show entire video)
+    this.backgroundVideo.setScale(scale);
+
+    // Play video looped and muted
+    this.backgroundVideo.play(true); // loop = true
+    this.backgroundVideo.setMute(true);
 
     // Add overlay to darken background for better text readability
     this.add.rectangle(
@@ -106,14 +82,35 @@ export class MenuScene extends Phaser.Scene {
     );
     titleText.setOrigin(0.5, 0.5);
 
+    // Animate title with a gentle floating effect
+    this.tweens.add({
+      targets: titleText,
+      y: 110,
+      duration: 1500,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    });
+
+    // Add subtle scale pulse to title
+    this.tweens.add({
+      targets: titleText,
+      scaleX: 1.05,
+      scaleY: 1.05,
+      duration: 2000,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    });
+
     // Add subtitle/tagline
     const subtitleText = this.add.text(
       CANVAS.width / 2,
-      160,
-      'Collect All Bones!',
+      170,
+      'On a mission to collect every single bone out there',
       {
         fontFamily: UI_TYPOGRAPHY.fontFamily,
-        fontSize: UI_TYPOGRAPHY.sizeSmall,
+        fontSize: UI_TYPOGRAPHY.sizeXS,
         color: UI_COLORS.textAccent,
         stroke: UI_COLORS.backgroundDark,
         strokeThickness: 2,
@@ -121,6 +118,21 @@ export class MenuScene extends Phaser.Scene {
       }
     );
     subtitleText.setOrigin(0.5, 0.5);
+
+    // Add dedication note bottom right
+    const dedicationText = this.add.text(
+      CANVAS.width - 20,
+      CANVAS.height - 20,
+      'Made by Sebastian for Priscila, with a lot of love',
+      {
+        fontFamily: UI_TYPOGRAPHY.fontFamily,
+        fontSize: UI_TYPOGRAPHY.sizeXS,
+        color: UI_COLORS.textSecondary,
+        align: 'right',
+      }
+    );
+    dedicationText.setOrigin(1, 1);
+    dedicationText.setAlpha(0.7);
 
     // Button configuration - smaller, tasteful, centered
     const buttonStartY = CANVAS.height / 2 - 20;
@@ -196,34 +208,13 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /**
-   * Stop menu music before scene transition
+   * Stop menu music and video before scene transition
    */
   private stopMenuMusic() {
-    if (this.menuMusic) {
-      this.menuMusic.stop();
-      console.log('🎵 Menu music stopped');
-    }
-  }
-
-  /**
-   * Safely attempts to play menu music after audio unlock
-   */
-  private tryPlayMenuMusic() {
-    console.log(`🎵 tryPlayMenuMusic called - menuMusic exists: ${!!this.menuMusic}, isPlaying: ${this.menuMusic?.isPlaying}, locked: ${this.sound.locked}`);
-    try {
-      if (this.menuMusic && !this.menuMusic.isPlaying) {
-        this.menuMusic.play();
-        console.log(`🎵 Menu music play() called - isPlaying now: ${this.menuMusic.isPlaying}`);
-
-        const soundConfig = (this.menuMusic as Phaser.Sound.BaseSound & { volume?: number; mute?: boolean });
-        console.log(`🎵 Music state - volume: ${soundConfig.volume}, mute: ${soundConfig.mute}`);
-      } else if (this.menuMusic?.isPlaying) {
-        console.log('🎵 Menu music already playing, skipping');
-      } else {
-        console.warn('⚠️ Menu music object is undefined');
-      }
-    } catch (e) {
-      console.warn('⚠️ Could not play menu music:', e);
+    AudioManager.stopMusic();
+    // Stop background video
+    if (this.backgroundVideo) {
+      this.backgroundVideo.stop();
     }
   }
 
@@ -243,17 +234,7 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
-      // Apply gameState sfxVolume multiplier
-      const finalVolume = volume * gameState.sfxVolume;
-
-      // Skip if effective volume is 0
-      if (finalVolume <= 0) {
-        console.log(`🎵 SFX skipped (zero volume): ${key}`);
-        return;
-      }
-
-      const played = this.sound.play(key, { volume: finalVolume });
-      console.log(`SFX play() called: ${key} played=${played} effectiveVolume=${finalVolume.toFixed(2)}`);
+      AudioManager.playSfx(key, volume);
     } catch (e) {
       console.warn(`⚠️ Could not play ${key}:`, e);
     }
@@ -270,9 +251,9 @@ export class MenuScene extends Phaser.Scene {
   ): Phaser.GameObjects.Container {
     const container = this.add.container(x, y);
 
-    // Button background (using Kenney UI asset) - smaller scale
+    // Button background (using Kenney UI asset) - compact scale
     const buttonBg = this.add.image(0, 0, 'ui_button_rectangle');
-    buttonBg.setScale(1.8); // Smaller scale for tasteful buttons
+    buttonBg.setScale(1.1, 0.7); // Compact buttons, keeping text same size
     buttonBg.setTint(Phaser.Display.Color.HexStringToColor(UI_COLORS.primary).color);
 
     // Button text - smaller font

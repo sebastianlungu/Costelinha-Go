@@ -59,7 +59,7 @@ export const level4: LevelDefinition = {
 
     // Bottom layer
     { x: 350, y: 520 },
-    { x: 650, y: 520 },
+    { x: 650, y: 470 },
     { x: 950, y: 520 },
 
     // Middle layer

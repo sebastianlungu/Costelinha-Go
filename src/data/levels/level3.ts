@@ -50,8 +50,8 @@ export const level3: LevelDefinition = {
     { x: 200, y: 620 },
 
     // First island
-    { x: 540, y: 520 },
-    { x: 620, y: 520 },
+    { x: 540, y: 470 },
+    { x: 620, y: 470 },
 
     // Second island
     { x: 950, y: 420 },

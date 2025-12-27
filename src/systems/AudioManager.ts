@@ -27,6 +27,7 @@ interface QueuedSound {
 class AudioManagerClass {
   private static instance: AudioManagerClass;
   private soundManager: Phaser.Sound.BaseSoundManager | null = null;
+  private cache: Phaser.Cache.CacheManager | null = null;
   private isAudioReady: boolean = false;
   private pendingSounds: QueuedSound[] = [];
   private hasLoggedReady: boolean = false;
@@ -50,6 +51,7 @@ class AudioManagerClass {
    */
   public init(soundManager: Phaser.Sound.BaseSoundManager): void {
     this.soundManager = soundManager;
+    this.cache = soundManager.game.cache;
     this.isAudioReady = false;
     this.hasLoggedReady = false;
 
@@ -212,6 +214,21 @@ class AudioManagerClass {
    */
   public playSfx(key: string, baseVolume: number = 1): void {
     const gameState = getGameState();
+    const cacheExists = this.cache?.audio.exists(key) ?? false;
+    const locked = this.soundManager?.locked ?? false;
+    const mute = this.soundManager?.mute ?? false;
+    const globalVolume = this.soundManager?.volume ?? 1;
+
+    console.log(`[AudioManager] SFX request: ${key} cache=${cacheExists} locked=${locked} mute=${mute} volume=${globalVolume.toFixed(2)} base=${baseVolume.toFixed(2)} settings(muted=${gameState.isMuted} sfx=${gameState.sfxVolume.toFixed(2)}) ready=${this.isAudioReady}`);
+
+    if (!cacheExists) {
+      const message = `[AudioManager] Missing audio key: ${key}`;
+      console.error(message);
+      if (import.meta.env.DEV) {
+        throw new Error(message);
+      }
+      return;
+    }
 
     // Check if muted
     if (gameState.isMuted) {
@@ -256,6 +273,21 @@ class AudioManagerClass {
    */
   public playMusic(key: string, baseVolume: number = 0.35, loop: boolean = true): void {
     const gameState = getGameState();
+    const cacheExists = this.cache?.audio.exists(key) ?? false;
+    const locked = this.soundManager?.locked ?? false;
+    const mute = this.soundManager?.mute ?? false;
+    const globalVolume = this.soundManager?.volume ?? 1;
+
+    console.log(`[AudioManager] Music request: ${key} cache=${cacheExists} locked=${locked} mute=${mute} volume=${globalVolume.toFixed(2)} base=${baseVolume.toFixed(2)} settings(muted=${gameState.isMuted} music=${gameState.musicVolume.toFixed(2)}) ready=${this.isAudioReady}`);
+
+    if (!cacheExists) {
+      const message = `[AudioManager] Missing audio key: ${key}`;
+      console.error(message);
+      if (import.meta.env.DEV) {
+        throw new Error(message);
+      }
+      return;
+    }
 
     // Check if muted
     if (gameState.isMuted) {

@@ -10,15 +10,10 @@ import {
 } from '../config/gameConfig';
 import { Score } from '../systems/Score';
 
-// Tilemap frame indices (18x18 tiles, 20 columns per row)
-// Row 0: tiles 0-19, Row 1: tiles 20-39, etc.
-// Hearts at row 0: full (col 4), half (col 5), empty (col 6)
-const HEART_FRAMES = {
-  full: 4,   // Full red heart at column 4, row 0
-  half: 5,   // Half heart at column 5, row 0
-  empty: 6,  // Empty heart outline at column 6, row 0
+const HEART_TEXTURES = {
+  full: 'heart_full',
+  empty: 'heart_empty',
 };
-const HEART_TEXTURE_KEY = 'tilemap_packed';
 
 export class HudScene extends Phaser.Scene {
   // Score panel elements
@@ -77,7 +72,7 @@ export class HudScene extends Phaser.Scene {
    * Creates the HP hearts display panel in the top-left corner
    */
   private createHeartsPanel() {
-    const heartTexture = this.assertHeartTexture();
+    this.assertHeartTextures();
     const panelX = UI_SPACING.medium;
     const panelY = UI_SPACING.medium;
     const heartScale = 2.0; // Scale up the 18x18 heart sprites
@@ -126,18 +121,18 @@ export class HudScene extends Phaser.Scene {
 
     // Create heart sprites
     this.hearts = [];
-    console.log(`HUD hearts using texture "${heartTexture.key}" (full: ${HEART_FRAMES.full}, empty: ${HEART_FRAMES.empty})`);
+    console.log(`HUD hearts using textures full="${HEART_TEXTURES.full}" empty="${HEART_TEXTURES.empty}"`);
     for (let i = 0; i < this.maxHP; i++) {
       const heartX = panelPadding + (heartSize / 2) + (i * (heartSize + heartSpacing));
       const heartY = panelPadding + (heartSize / 2);
 
       // Determine which frame to use based on current HP
-      const frameIndex = i < this.currentHP ? HEART_FRAMES.full : HEART_FRAMES.empty;
+      const textureKey = i < this.currentHP ? HEART_TEXTURES.full : HEART_TEXTURES.empty;
 
-      const heart = this.add.image(heartX, heartY, HEART_TEXTURE_KEY, frameIndex);
+      const heart = this.add.image(heartX, heartY, textureKey);
       heart.setScale(heartScale);
 
-      console.log(`HUD heart[${i}] texture=${heart.texture.key} frame=${heart.frame.name}`);
+      console.log(`HUD heart[${i}] texture=${heart.texture.key}`);
       this.hearts.push(heart);
       this.heartContainer.add(heart);
     }
@@ -149,18 +144,11 @@ export class HudScene extends Phaser.Scene {
    * Ensures the heart texture and frames exist.
    * Fail-loud to avoid rendering placeholder squares.
    */
-  private assertHeartTexture(): Phaser.Textures.Texture {
-    if (!this.textures.exists(HEART_TEXTURE_KEY)) {
-      throw new Error(`Missing HUD heart texture "${HEART_TEXTURE_KEY}". Check BootScene.preload() and asset paths.`);
+  private assertHeartTextures(): void {
+    const missing = Object.values(HEART_TEXTURES).filter(key => !this.textures.exists(key));
+    if (missing.length > 0) {
+      throw new Error(`Missing HUD heart texture(s): ${missing.join(', ')}. Check BootScene.preload() and asset paths.`);
     }
-
-    const texture = this.textures.get(HEART_TEXTURE_KEY);
-    const missingFrames = [HEART_FRAMES.full, HEART_FRAMES.empty].filter(frame => !texture.has(frame));
-    if (missingFrames.length > 0) {
-      throw new Error(`Missing HUD heart frame(s) ${missingFrames.join(', ')} in texture "${HEART_TEXTURE_KEY}".`);
-    }
-
-    return texture;
   }
 
   /**
@@ -342,11 +330,11 @@ export class HudScene extends Phaser.Scene {
 
       if (i < newHP) {
         // Full heart
-        heart.setFrame(HEART_FRAMES.full);
+        heart.setTexture(HEART_TEXTURES.full);
         heart.setAlpha(1);
       } else {
         // Empty heart
-        heart.setFrame(HEART_FRAMES.empty);
+        heart.setTexture(HEART_TEXTURES.empty);
         heart.setAlpha(0.7);
       }
     }

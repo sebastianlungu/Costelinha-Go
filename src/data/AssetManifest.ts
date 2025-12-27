@@ -98,17 +98,12 @@ export const ASSET_MANIFEST = {
       status: 'ready' as const,
     },
 
-    // Hearts for HP pickup (from tilemap.png)
+    // Hearts for HP pickup (individual PNGs)
     heart: {
-      // Heart sprites exist in tilemap.png at specific tile positions
-      // Full heart: row 0, around column 10-11 (tile indices ~40-41)
-      // Empty heart: next to full heart
-      tilemap: '/Tilemap/tilemap_packed.png',
-      tileSize: 18, // Packed tilemap uses 18x18 tiles
-      tiles: {
-        heartFull: { x: 4, y: 0 },    // Red full heart
-        heartHalf: { x: 5, y: 0 },    // Half heart
-        heartEmpty: { x: 6, y: 0 },   // Empty heart outline
+      type: 'image' as const,
+      paths: {
+        heartFull: '/ui/heart_full.png',
+        heartEmpty: '/ui/heart_empty.png',
       },
       status: 'ready' as const,
     },
@@ -535,8 +530,9 @@ export const ASSET_MANIFEST = {
 
     // HUD elements
     hud: {
-      // Hearts from tilemap (need extraction)
-      heartFullTilemap: '/Tilemap/tilemap_packed.png',
+      // Hearts for HP display
+      heartFull: '/ui/heart_full.png',
+      heartEmpty: '/ui/heart_empty.png',
       // Using star for score display
       scoreStar: '/ui/Default/star.png',
     },
@@ -579,11 +575,11 @@ export const ASSET_MANIFEST = {
   },
 
   // ---------------------------------------------------------------------------
-  // AUDIO (paths only - actual files in /public/audio/)
+  // AUDIO (paths only - actual files in /assets/audio/)
   // ---------------------------------------------------------------------------
   audio: {
     music: {
-      menu: ['/audio/music/menu_music.mp3', '/audio/music/menu_music.ogg'],
+      menu: '/audio/ocean-waves-376898.mp3',
       game: ['/audio/music/game_music.mp3', '/audio/music/game_music.ogg'],
     },
     sfx: {
@@ -664,12 +660,6 @@ export const THEME_ASSETS: Record<ThemeId, {
 export const MISSING_ASSETS = {
   critical: [
     {
-      asset: 'Heart sprites (individual PNGs)',
-      description: 'Need heart_full.png, heart_empty.png for HP display',
-      workaround: 'Extract from tilemap_packed.png at tile positions (4,0), (6,0)',
-      suggestedSource: 'Already in tilemap - just needs extraction OR use tilemap directly',
-    },
-    {
       asset: 'Enemy sprites (animated)',
       description: 'Current enemy sprites in tilemap-characters are static, need walk/attack anims',
       workaround: 'Use static sprites with simple movement, or tween-based animation',
@@ -747,6 +737,8 @@ export function validateAssetManifest(
 
     // UI
     'ui_star',
+    'heart_full',
+    'heart_empty',
     'ui_button_rectangle',
     'ui_button_square',
     'ui_arrow_up',

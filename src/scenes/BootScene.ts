@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { UI_TYPOGRAPHY } from '../config/gameConfig';
+import { AudioManager } from '../systems/AudioManager';
 
 export class BootScene extends Phaser.Scene {
   private fontLoaded: boolean = false;
@@ -23,8 +24,8 @@ export class BootScene extends Phaser.Scene {
       frameHeight: 339
     });
 
-    // Load menu background
-    this.load.image('menu_background', '/menu_background.png');
+    // Load menu background video
+    this.load.video('menu_background_video', '/menu_background.mp4', true);
 
     // Load bone collectible sprite
     this.load.image('bone', '/food/bone.png');
@@ -47,6 +48,8 @@ export class BootScene extends Phaser.Scene {
 
     // Load UI icons
     this.load.image('ui_star', '/ui/star.png'); // Star icon for score display
+    this.load.image('heart_full', '/ui/heart_full.png'); // HUD full heart
+    this.load.image('heart_empty', '/ui/heart_empty.png'); // HUD empty heart
 
     // Load UI button assets (from Kenney UI pack)
     this.load.image('ui_button_rectangle', '/ui/Default/button_rectangle_depth_border.png'); // Main button
@@ -57,8 +60,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('ui_arrow_left', '/ui/arrowLeft.png'); // Left arrow
     this.load.image('ui_arrow_right', '/ui/arrowRight.png'); // Right arrow
 
-    // Load tilemap for heart sprites (18x18 tiles, 20 columns, 9 rows)
-    // Hearts are at: full heart (4,0), half heart (5,0), empty heart (6,0)
+    // Load tilemap for misc packed tiles (18x18 tiles, 20 columns, 9 rows)
     this.load.spritesheet('tilemap_packed', '/Tilemap/tilemap_packed.png', {
       frameWidth: 18,
       frameHeight: 18,
@@ -72,7 +74,7 @@ export class BootScene extends Phaser.Scene {
 
     // Music - provide both MP3 and OGG for cross-browser support
     // Phaser will automatically use the first compatible format
-    this.load.audio('menu_music', ['/audio/music/menu_music.mp3', '/audio/music/menu_music.ogg']);
+    this.load.audio('menu_music', '/audio/ocean-waves-376898.mp3');
     this.load.audio('game_music', ['/audio/music/game_music.mp3', '/audio/music/game_music.ogg']);
 
     // SFX - provide both formats for Safari compatibility
@@ -103,6 +105,9 @@ export class BootScene extends Phaser.Scene {
 
     // FAIL-LOUD ASSET VALIDATION
     this.validateAssets();
+
+    // Initialize centralized audio manager (single source of truth)
+    AudioManager.init(this.sound);
 
     // Create animations from spritesheet frame indices
     // Frame indices: 0-3 idle, 4-6 walk, 7 jump, 8 airborne, 9 falling
@@ -223,7 +228,7 @@ export class BootScene extends Phaser.Scene {
     const requiredTextures = [
       // Dog spritesheet (single texture with all animation frames)
       'dog',
-      'menu_background',  // Menu background image
+      // Note: menu_background_video is validated separately as video, not texture
       'bone',             // Bone collectible
       // Parallax background layers
       'bg_sky',           // Sky tile
@@ -240,6 +245,8 @@ export class BootScene extends Phaser.Scene {
       'particle_dust',    // Dust effect for jump/land
       // UI icons
       'ui_star',          // Star icon for score display
+      'heart_full',       // HUD full heart
+      'heart_empty',      // HUD empty heart
       // UI buttons and controls
       'ui_button_rectangle', // Rectangle button
       'ui_button_square',    // Square button

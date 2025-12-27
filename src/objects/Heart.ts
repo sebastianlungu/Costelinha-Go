@@ -3,7 +3,7 @@ import { DEPTHS } from '../config/gameConfig';
 
 /**
  * Heart collectible that restores player HP when collected.
- * Uses heart sprite from tilemap_packed.png (frame 4 = full heart at column 4, row 0).
+ * Uses heart_full.png for the heart pickup sprite.
  * Features floating animation, pulse effect, and particle burst on collection.
  */
 export class Heart extends Phaser.Events.EventEmitter {
@@ -13,26 +13,18 @@ export class Heart extends Phaser.Events.EventEmitter {
   private floatTween?: Phaser.Tweens.Tween;
   private pulseTween?: Phaser.Tweens.Tween;
 
-  // Tilemap frame indices (18x18 tiles, 20 columns per row)
-  // Hearts at row 0: full (col 4), half (col 5), empty (col 6)
-  private static readonly HEART_FRAME_FULL = 4;
   private static readonly SCALE = 2; // Scale up from 18x18
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super();
     this.scene = scene;
 
-    if (!scene.textures.exists('tilemap_packed')) {
-      throw new Error('Missing heart texture "tilemap_packed". Check BootScene.preload() and asset paths.');
-    }
-    const texture = scene.textures.get('tilemap_packed');
-    if (!texture.has(Heart.HEART_FRAME_FULL)) {
-      throw new Error(`Missing heart frame ${Heart.HEART_FRAME_FULL} in "tilemap_packed".`);
+    if (!scene.textures.exists('heart_full')) {
+      throw new Error('Missing heart texture "heart_full". Check BootScene.preload() and asset paths.');
     }
 
-    // Create sprite using heart frame from tilemap
-    // tilemap_packed is 20 columns, heart full is at (4, 0) = frame 4
-    this.sprite = scene.physics.add.sprite(x, y, 'tilemap_packed', Heart.HEART_FRAME_FULL);
+    // Create sprite using dedicated heart asset
+    this.sprite = scene.physics.add.sprite(x, y, 'heart_full');
     this.sprite.setScale(Heart.SCALE);
     this.sprite.setDepth(DEPTHS.collectibles);
 

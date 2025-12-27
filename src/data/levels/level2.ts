@@ -44,7 +44,7 @@ export const level2: LevelDefinition = {
   bones: [
     // Ground bones
     { x: 200, y: 620 },
-    { x: 800, y: 620 },
+    { x: 660, y: 620 },
     { x: 1000, y: 620 },
 
     // Zig-zag path bones (above platforms)
@@ -57,7 +57,7 @@ export const level2: LevelDefinition = {
 
     // Right side platform bones
     { x: 775, y: 490 },
-    { x: 1040, y: 420 },
+    { x: 1040, y: 360 },
     { x: 1150, y: 620 },
 
     // Upper right bonus bone (reachable from P8 at y=450)

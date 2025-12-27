@@ -59,7 +59,7 @@ export const level5: LevelDefinition = {
     { x: 910, y: 310 },
 
     // Rest platform
-    { x: 1090, y: 370 },
+    { x: 1090, y: 320 },
 
     // Descending
     { x: 930, y: 470 },
