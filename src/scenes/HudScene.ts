@@ -18,6 +18,7 @@ const HEART_FRAMES = {
   half: 5,   // Half heart at column 5, row 0
   empty: 6,  // Empty heart outline at column 6, row 0
 };
+const HEART_TEXTURE_KEY = 'tilemap_packed';
 
 export class HudScene extends Phaser.Scene {
   // Score panel elements
@@ -76,6 +77,7 @@ export class HudScene extends Phaser.Scene {
    * Creates the HP hearts display panel in the top-left corner
    */
   private createHeartsPanel() {
+    const heartTexture = this.assertHeartTexture();
     const panelX = UI_SPACING.medium;
     const panelY = UI_SPACING.medium;
     const heartScale = 2.0; // Scale up the 18x18 heart sprites
@@ -124,6 +126,7 @@ export class HudScene extends Phaser.Scene {
 
     // Create heart sprites
     this.hearts = [];
+    console.log(`HUD hearts using texture "${heartTexture.key}" (full: ${HEART_FRAMES.full}, empty: ${HEART_FRAMES.empty})`);
     for (let i = 0; i < this.maxHP; i++) {
       const heartX = panelPadding + (heartSize / 2) + (i * (heartSize + heartSpacing));
       const heartY = panelPadding + (heartSize / 2);
@@ -131,14 +134,33 @@ export class HudScene extends Phaser.Scene {
       // Determine which frame to use based on current HP
       const frameIndex = i < this.currentHP ? HEART_FRAMES.full : HEART_FRAMES.empty;
 
-      const heart = this.add.image(heartX, heartY, 'tilemap_packed', frameIndex);
+      const heart = this.add.image(heartX, heartY, HEART_TEXTURE_KEY, frameIndex);
       heart.setScale(heartScale);
 
+      console.log(`HUD heart[${i}] texture=${heart.texture.key} frame=${heart.frame.name}`);
       this.hearts.push(heart);
       this.heartContainer.add(heart);
     }
 
     console.log(`Hearts panel created with ${this.maxHP} hearts (${this.currentHP} full)`);
+  }
+
+  /**
+   * Ensures the heart texture and frames exist.
+   * Fail-loud to avoid rendering placeholder squares.
+   */
+  private assertHeartTexture(): Phaser.Textures.Texture {
+    if (!this.textures.exists(HEART_TEXTURE_KEY)) {
+      throw new Error(`Missing HUD heart texture "${HEART_TEXTURE_KEY}". Check BootScene.preload() and asset paths.`);
+    }
+
+    const texture = this.textures.get(HEART_TEXTURE_KEY);
+    const missingFrames = [HEART_FRAMES.full, HEART_FRAMES.empty].filter(frame => !texture.has(frame));
+    if (missingFrames.length > 0) {
+      throw new Error(`Missing HUD heart frame(s) ${missingFrames.join(', ')} in texture "${HEART_TEXTURE_KEY}".`);
+    }
+
+    return texture;
   }
 
   /**

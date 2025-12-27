@@ -60,6 +60,7 @@ export class GameScene extends Phaser.Scene {
   private gameOverOverlay?: Phaser.GameObjects.Container;
   private levelCompleteOverlay?: Phaser.GameObjects.Container;
   private checkpointHP: number = 5; // HP at level start for restart
+  private isHandlingBoneCollect: boolean = false;
 
   // Flag for reachFlag completion goal (level 10)
   private flagSprite?: Phaser.Physics.Arcade.Sprite;
@@ -307,6 +308,8 @@ export class GameScene extends Phaser.Scene {
 
     // Create enemies from config
     this.createEnemies();
+    // Dev-only validation: log any bone/enemy overlaps at spawn time
+    this.logBoneEnemyOverlaps();
 
     // Create flag if level uses reachFlag goal
     if (this.levelDefinition?.completionGoal === 'reachFlag' && this.levelDefinition.flagPosition) {
@@ -319,6 +322,8 @@ export class GameScene extends Phaser.Scene {
     // Setup D key for debug toggle
     this.keyD = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
 
+    // RUNTIME ASSERTION: Score must only change during bone collection
+    this.scoreSystem.on('score-changed', this.assertScoreChangeContext, this);
     // Listen to score changes to check for win condition
     this.scoreSystem.on('score-changed', this.checkWinCondition, this);
   }
@@ -533,6 +538,59 @@ export class GameScene extends Phaser.Scene {
     );
 
     console.log(`🦀 Created ${this.enemies.length} enemies`);
+  }
+
+  /**
+   * Logs any bone/enemy overlaps at spawn time for debugging.
+   */
+  private logBoneEnemyOverlaps(): void {
+    if (this.collectibles.length === 0 || this.enemies.length === 0) {
+      return;
+    }
+
+    const levelLabel = this.levelDefinition
+      ? `Level ${this.levelDefinition.levelIndex} (${this.levelDefinition.levelName})`
+      : 'Legacy level';
+
+    const overlaps: Array<{
+      boneIndex: number;
+      enemyIndex: number;
+      enemyType: string;
+      boneX: number;
+      boneY: number;
+      enemyX: number;
+      enemyY: number;
+    }> = [];
+
+    this.collectibles.forEach((collectible, boneIndex) => {
+      const boneBounds = collectible.sprite.getBounds();
+      this.enemies.forEach((enemy, enemyIndex) => {
+        const enemyBounds = enemy.sprite.getBounds();
+        if (Phaser.Geom.Intersects.RectangleToRectangle(boneBounds, enemyBounds)) {
+          overlaps.push({
+            boneIndex,
+            enemyIndex,
+            enemyType: enemy.getTypeName(),
+            boneX: collectible.sprite.x,
+            boneY: collectible.sprite.y,
+            enemyX: enemy.sprite.x,
+            enemyY: enemy.sprite.y,
+          });
+        }
+      });
+    });
+
+    if (overlaps.length > 0) {
+      console.warn(`Bone/enemy overlaps detected at spawn (${levelLabel}): ${overlaps.length}`);
+      overlaps.forEach((overlap) => {
+        console.warn(
+          `  overlap bone[${overlap.boneIndex}] (${overlap.boneX}, ${overlap.boneY}) ` +
+          `enemy[${overlap.enemyIndex}] ${overlap.enemyType} (${overlap.enemyX}, ${overlap.enemyY})`
+        );
+      });
+    } else {
+      console.log(`No bone/enemy overlaps detected at spawn (${levelLabel})`);
+    }
   }
 
   /**
@@ -937,7 +995,12 @@ export class GameScene extends Phaser.Scene {
     bone.disableBody(true, true);
 
     // Then increment score using Score system
-    this.scoreSystem.addScore(1);
+    this.isHandlingBoneCollect = true;
+    try {
+      this.scoreSystem.addScore(1);
+    } finally {
+      this.isHandlingBoneCollect = false;
+    }
 
     console.log(`🍖 Collected bone at (${bone.x}, ${bone.y}), score: ${this.scoreSystem.score}/${COLLECTIBLES.count}`);
   }
@@ -1007,6 +1070,17 @@ export class GameScene extends Phaser.Scene {
       this.showLevelCompleteOverlay();
       console.log('All bones collected! Level complete!');
     }
+  }
+
+  private assertScoreChangeContext(score: number, totalBones: number): void {
+    if (this.isHandlingBoneCollect) {
+      return;
+    }
+
+    const error = new Error(`Score changed outside bone pickup handler (score=${score}/${totalBones}).`);
+    console.error('SCORE INTEGRITY VIOLATION: score changed without bone pickup.');
+    console.error(error.stack || error.message);
+    throw error;
   }
 
   /**
@@ -1468,8 +1542,9 @@ export class GameScene extends Phaser.Scene {
    */
   private playSound(key: string, finalVolume: number): void {
     try {
-      this.sound.play(key, { volume: finalVolume });
-      console.log(`🎵 SFX played: ${key} at volume ${finalVolume.toFixed(2)}`);
+      const cacheExists = this.cache.audio.exists(key);
+      const played = this.sound.play(key, { volume: finalVolume });
+      console.log(`SFX play() called: ${key} played=${played} cache=${cacheExists} locked=${this.sound.locked} mute=${this.sound.mute} volume=${this.sound.volume.toFixed(2)} effectiveVolume=${finalVolume.toFixed(2)}`);
     } catch (e) {
       console.warn(`⚠️ Could not play SFX ${key}:`, e);
     }
@@ -1483,6 +1558,8 @@ export class GameScene extends Phaser.Scene {
   private tryPlaySound(key: string, volume: number = 1) {
     try {
       const gameState = getGameState();
+      const cacheExists = this.cache.audio.exists(key);
+      console.log(`SFX request: ${key} cache=${cacheExists} locked=${this.sound.locked} mute=${this.sound.mute} volume=${this.sound.volume.toFixed(2)} settings(muted=${gameState.isMuted} sfx=${gameState.sfxVolume.toFixed(2)}) base=${volume.toFixed(2)}`);
 
       // Check if muted
       if (gameState.isMuted) {

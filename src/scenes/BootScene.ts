@@ -82,6 +82,12 @@ export class BootScene extends Phaser.Scene {
     this.load.audio('ui_click_sfx', ['/audio/sfx/ui_click.mp3', '/audio/sfx/ui_click.ogg']);
     this.load.audio('win_sfx', ['/audio/sfx/win.mp3', '/audio/sfx/win.ogg']);
 
+    // Log audio load success per key
+    this.load.on('filecomplete-audio', (key: string) => {
+      const exists = this.cache.audio.exists(key);
+      console.log(`🎵 Audio loaded: ${key} (cache: ${exists})`);
+    });
+
     // Add audio load error detection for debugging
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
       console.error(`❌ Failed to load: ${file.key} from ${file.url}`);

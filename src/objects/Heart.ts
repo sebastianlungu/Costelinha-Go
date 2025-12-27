@@ -22,6 +22,14 @@ export class Heart extends Phaser.Events.EventEmitter {
     super();
     this.scene = scene;
 
+    if (!scene.textures.exists('tilemap_packed')) {
+      throw new Error('Missing heart texture "tilemap_packed". Check BootScene.preload() and asset paths.');
+    }
+    const texture = scene.textures.get('tilemap_packed');
+    if (!texture.has(Heart.HEART_FRAME_FULL)) {
+      throw new Error(`Missing heart frame ${Heart.HEART_FRAME_FULL} in "tilemap_packed".`);
+    }
+
     // Create sprite using heart frame from tilemap
     // tilemap_packed is 20 columns, heart full is at (4, 0) = frame 4
     this.sprite = scene.physics.add.sprite(x, y, 'tilemap_packed', Heart.HEART_FRAME_FULL);

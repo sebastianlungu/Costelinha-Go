@@ -234,6 +234,8 @@ export class MenuScene extends Phaser.Scene {
   private tryPlaySound(key: string, volume: number = 1) {
     try {
       const gameState = getGameState();
+      const cacheExists = this.cache.audio.exists(key);
+      console.log(`SFX request: ${key} cache=${cacheExists} locked=${this.sound.locked} mute=${this.sound.mute} volume=${this.sound.volume.toFixed(2)} settings(muted=${gameState.isMuted} sfx=${gameState.sfxVolume.toFixed(2)}) base=${volume.toFixed(2)}`);
 
       // Check if muted
       if (gameState.isMuted) {
@@ -250,8 +252,8 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
-      this.sound.play(key, { volume: finalVolume });
-      console.log(`🎵 SFX played: ${key} at volume ${finalVolume.toFixed(2)}`);
+      const played = this.sound.play(key, { volume: finalVolume });
+      console.log(`SFX play() called: ${key} played=${played} effectiveVolume=${finalVolume.toFixed(2)}`);
     } catch (e) {
       console.warn(`⚠️ Could not play ${key}:`, e);
     }
