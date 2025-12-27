@@ -73,7 +73,8 @@ export class GameScene extends Phaser.Scene {
     // RUNTIME ASSERTION: Verify only ONE player sprite exists in this scene
     // This catches bugs where player might be created multiple times
     const playerSprites = this.children.list.filter(
-      child => child instanceof Phaser.Physics.Arcade.Sprite && child.texture.key.startsWith('dog_')
+      child => child instanceof Phaser.Physics.Arcade.Sprite &&
+               (child.texture.key === 'dog' || child.texture.key.startsWith('dog_'))
     );
     if (playerSprites.length !== 1) {
       throw new Error(`❌ CRITICAL BUG: Expected exactly 1 player sprite, found ${playerSprites.length}. Check for duplicate player creation.`);
