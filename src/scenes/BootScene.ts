@@ -8,23 +8,13 @@ export class BootScene extends Phaser.Scene {
   preload() {
     console.log('🎨 Loading assets...');
 
-    // Load dog animation frames as individual images
-    // Note: Vite serves assets/ as public root, so reference from /
-    // Idle frames (4 frames)
-    this.load.image('dog_idle_1', '/atlas/idle1.png');
-    this.load.image('dog_idle_2', '/atlas/idle2.png');
-    this.load.image('dog_idle_3', '/atlas/idle3.png');
-    this.load.image('dog_idle_4', '/atlas/idle4.png');
-
-    // Walk frames (3 frames)
-    this.load.image('dog_walk_1', '/atlas/walk1.png');
-    this.load.image('dog_walk_2', '/atlas/walk2.png');
-    this.load.image('dog_walk_3', '/atlas/walk3.png');
-
-    // Jump frames (3 frames: jump, airborne, falling)
-    this.load.image('dog_jump', '/atlas/jump.png');
-    this.load.image('dog_airborne', '/atlas/airborne.png');
-    this.load.image('dog_falling', '/atlas/falling.png');
+    // Load dog animation spritesheet (all frames in a single image)
+    // Frame order: idle1, idle2, idle3, idle4, walk1, walk2, walk3, jump, airborne, falling
+    // Frame size: 383x339 (normalized from varying original sizes)
+    this.load.spritesheet('dog', '/atlas/dog_spritesheet.png', {
+      frameWidth: 383,
+      frameHeight: 339
+    });
 
     // Load menu background
     this.load.image('menu_background', '/menu_background.png');
@@ -85,47 +75,46 @@ export class BootScene extends Phaser.Scene {
     // FAIL-LOUD ASSET VALIDATION
     this.validateAssets();
 
-    // Create animations from individual frames
+    // Create animations from spritesheet frame indices
+    // Frame indices: 0-3 idle, 4-6 walk, 7 jump, 8 airborne, 9 falling
+    // Using a single spritesheet prevents texture-swapping flicker
+
+    // Idle: frames 0-3
     this.anims.create({
       key: 'idle',
-      frames: [
-        { key: 'dog_idle_1' },
-        { key: 'dog_idle_2' },
-        { key: 'dog_idle_3' },
-        { key: 'dog_idle_4' },
-      ],
+      frames: this.anims.generateFrameNumbers('dog', { start: 0, end: 3 }),
       frameRate: 8,
       repeat: -1
     });
 
+    // Walk: frames 4-6
     this.anims.create({
       key: 'walk',
-      frames: [
-        { key: 'dog_walk_1' },
-        { key: 'dog_walk_2' },
-        { key: 'dog_walk_3' },
-      ],
+      frames: this.anims.generateFrameNumbers('dog', { start: 4, end: 6 }),
       frameRate: 10,
       repeat: -1
     });
 
+    // Jump: frame 7
     this.anims.create({
       key: 'jump',
-      frames: [{ key: 'dog_jump' }],
+      frames: this.anims.generateFrameNumbers('dog', { start: 7, end: 7 }),
       frameRate: 1,
       repeat: 0
     });
 
+    // Airborne: frame 8 (currently unused but kept for future)
     this.anims.create({
       key: 'airborne',
-      frames: [{ key: 'dog_airborne' }],
+      frames: this.anims.generateFrameNumbers('dog', { start: 8, end: 8 }),
       frameRate: 1,
       repeat: 0
     });
 
+    // Fall: frame 9
     this.anims.create({
       key: 'fall',
-      frames: [{ key: 'dog_falling' }],
+      frames: this.anims.generateFrameNumbers('dog', { start: 9, end: 9 }),
       frameRate: 1,
       repeat: 0
     });
@@ -145,10 +134,8 @@ export class BootScene extends Phaser.Scene {
   private validateAssets() {
     // Define manifest of all required texture keys
     const requiredTextures = [
-      // Dog animation frames
-      'dog_idle_1', 'dog_idle_2', 'dog_idle_3', 'dog_idle_4',
-      'dog_walk_1', 'dog_walk_2', 'dog_walk_3',
-      'dog_jump', 'dog_airborne', 'dog_falling',
+      // Dog spritesheet (single texture with all animation frames)
+      'dog',
       'menu_background',  // Menu background image
       'bone',             // Bone collectible
       // Parallax background layers

@@ -17,8 +17,8 @@ export class Player extends Phaser.Events.EventEmitter {
     this.scene = scene;
     this.dustEmitter = dustEmitter;
 
-    // Create sprite with physics (use first idle frame)
-    this.sprite = scene.physics.add.sprite(x, y, 'dog_idle_1');
+    // Create sprite with physics (use spritesheet with frame 0 = first idle frame)
+    this.sprite = scene.physics.add.sprite(x, y, 'dog', 0);
 
     // Scale down the sprite (PNGs are ~327x268, need to scale to ~48x48)
     this.sprite.setScale(0.15);
