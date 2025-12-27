@@ -56,62 +56,52 @@ export class Player extends Phaser.Events.EventEmitter {
       return;
     }
 
-    // Use body.blocked.down for more stable ground detection (less flickering than touching.down)
-    const isGrounded = body.blocked.down || body.touching.down;
-
-    // Handle horizontal movement - use velocity for responsive ground control, acceleration for air
+    // Handle horizontal movement (always allowed)
     const isLeftDown = this.cursors.left.isDown || this.keyA.isDown;
     const isRightDown = this.cursors.right.isDown || this.keyD.isDown;
 
     if (isLeftDown) {
-      // Direct velocity for responsive ground movement, acceleration helps in air
       this.sprite.setVelocityX(-PLAYER.speed);
       this.sprite.setAccelerationX(-PLAYER.acceleration);
-      this.sprite.flipX = false; // Face left (original sprite direction)
+      this.sprite.flipX = false;
     } else if (isRightDown) {
       this.sprite.setVelocityX(PLAYER.speed);
       this.sprite.setAccelerationX(PLAYER.acceleration);
-      this.sprite.flipX = true; // Face right (flip sprite horizontally)
+      this.sprite.flipX = true;
     } else {
       this.sprite.setAccelerationX(0);
-      // Let drag handle deceleration naturally
     }
 
-    // Handle jump
+    // Jump - use raw physics flags (any true frame allows jump)
+    const canJump = body.blocked.down || body.touching.down;
     const isJumpPressed = this.cursors.up.isDown || this.cursors.space.isDown;
-    if (isJumpPressed && isGrounded) {
+    if (isJumpPressed && canJump) {
       this.sprite.setVelocityY(PLAYER.jumpVelocity);
-
-      // Emit dust particles at player's feet on jump
       if (this.dustEmitter) {
         this.dustEmitter.emitParticleAt(this.sprite.x, this.sprite.y + PLAYER.height / 2, 4);
       }
-
-      // Emit 'jumped' event for sound
       this.emit('jumped');
     }
 
-    // Animation state machine (prevent jitter with landing lock)
-    if (time < this.landingLockUntil) {
-      return; // Skip animation updates during landing lock
-    }
-    const isMoving = Math.abs(body.velocity.x) > 10;
+    // Detect landing: was airborne (velocity large), now grounded (velocity small)
+    const wasAirborne = this.wasGrounded === false;
+    const isAirborne = Math.abs(body.velocity.y) > 50;
 
-    // Detect landing (transition from air to ground)
-    if (isGrounded && !this.wasGrounded) {
-      // Player just landed - emit dust particles
+    if (wasAirborne && !isAirborne && body.velocity.y >= 0) {
       if (this.dustEmitter) {
         this.dustEmitter.emitParticleAt(this.sprite.x, this.sprite.y + PLAYER.height / 2, 5);
       }
-
-      // Emit 'landed' event for camera shake
       this.emit('landed');
     }
+    this.wasGrounded = !isAirborne;
 
-    // Update grounded state for next frame
-    this.wasGrounded = isGrounded;
+    // Animation based purely on velocity (not grounded state)
+    if (time < this.landingLockUntil) return;
 
-    if (isGrounded) {
+    const isMoving = Math.abs(body.velocity.x) > 10;
+
+    if (Math.abs(body.velocity.y) < 50) {
+      // Ground animations (velocity.y is small = on ground)
       if (isMoving && this.animState !== 'walk') {
         this.animState = 'walk';
         this.sprite.play('walk', true);
@@ -119,14 +109,15 @@ export class Player extends Phaser.Events.EventEmitter {
         this.animState = 'idle';
         this.sprite.play('idle', true);
       }
-    } else {
-      // In air
-      if (body.velocity.y < 0 && this.animState !== 'jump') {
-        // Jumping up
+    } else if (body.velocity.y < 0) {
+      // Jumping up
+      if (this.animState !== 'jump') {
         this.animState = 'jump';
         this.sprite.play('jump', true);
-      } else if (body.velocity.y > 0 && this.animState !== 'fall') {
-        // Falling down
+      }
+    } else {
+      // Falling down
+      if (this.animState !== 'fall') {
         this.animState = 'fall';
         this.sprite.play('fall', true);
       }

@@ -63,16 +63,22 @@ export class BootScene extends Phaser.Scene {
     // Load audio assets
     console.log('🎵 Loading audio assets...');
 
-    // Music
-    this.load.audio('menu_music', '/audio/music/menu_music.mp3');
-    this.load.audio('game_music', '/audio/music/game_music.ogg');
+    // Music - provide both MP3 and OGG for cross-browser support
+    // Phaser will automatically use the first compatible format
+    this.load.audio('menu_music', ['/audio/music/menu_music.mp3', '/audio/music/menu_music.ogg']);
+    this.load.audio('game_music', ['/audio/music/game_music.mp3', '/audio/music/game_music.ogg']);
 
-    // SFX (all OGG format from Motion Monkey Retro Arcade Sounds Pack - CC0)
-    this.load.audio('jump_sfx', '/audio/sfx/jump.ogg');
-    this.load.audio('land_sfx', '/audio/sfx/land.ogg');
-    this.load.audio('collect_sfx', '/audio/sfx/collect.ogg');
-    this.load.audio('ui_click_sfx', '/audio/sfx/ui_click.ogg');
-    this.load.audio('win_sfx', '/audio/sfx/win.ogg');
+    // SFX - provide both formats for Safari compatibility
+    this.load.audio('jump_sfx', ['/audio/sfx/jump.mp3', '/audio/sfx/jump.ogg']);
+    this.load.audio('land_sfx', ['/audio/sfx/land.mp3', '/audio/sfx/land.ogg']);
+    this.load.audio('collect_sfx', ['/audio/sfx/collect.mp3', '/audio/sfx/collect.ogg']);
+    this.load.audio('ui_click_sfx', ['/audio/sfx/ui_click.mp3', '/audio/sfx/ui_click.ogg']);
+    this.load.audio('win_sfx', ['/audio/sfx/win.mp3', '/audio/sfx/win.ogg']);
+
+    // Add audio load error detection for debugging
+    this.load.on('loaderror', (file: Phaser.Loader.File) => {
+      console.error(`❌ Failed to load: ${file.key} from ${file.url}`);
+    });
   }
 
   create() {

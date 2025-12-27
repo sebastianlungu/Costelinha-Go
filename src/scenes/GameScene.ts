@@ -81,6 +81,7 @@ export class GameScene extends Phaser.Scene {
     console.log(`🐕 Player instance verified (count: ${playerSprites.length})`);
 
     // Add collision between player and platforms
+    // Ground detection is handled in Player.update() using sticky velocity-based logic
     this.physics.add.collider(this.player.sprite, this.platformGroup);
 
     // Setup smooth camera follow with deadzone
@@ -280,15 +281,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handlePlayerLanding() {
-    // Throttle land sound to prevent spam
+    // Throttle land sound AND camera shake to prevent spam
     const currentTime = this.time.now;
     if (currentTime - this.lastLandSoundTime > this.landSoundThrottle) {
       this.tryPlaySound('land_sfx', 0.6);
+      // Subtle camera shake on landing (also throttled)
+      this.cameras.main.shake(CAMERA.shake.duration, CAMERA.shake.intensity);
       this.lastLandSoundTime = currentTime;
     }
-
-    // Subtle camera shake on landing
-    this.cameras.main.shake(CAMERA.shake.duration, CAMERA.shake.intensity);
   }
 
   private checkWinCondition(score: number) {
