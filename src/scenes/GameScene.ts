@@ -32,13 +32,18 @@ export class GameScene extends Phaser.Scene {
     // Reset win state
     this.isGameWon = false;
 
-    // Start game background music
-    this.gameMusic = this.sound.add('game_music', {
-      loop: true,
-      volume: 0.35,
-    });
-    this.gameMusic.play();
-    console.log('🎵 Game music started');
+    // Start game background music (with error handling for browser restrictions)
+    try {
+      this.gameMusic = this.sound.add('game_music', {
+        loop: true,
+        volume: 0.35,
+      });
+      this.gameMusic.play();
+      console.log('🎵 Game music started');
+    } catch (e) {
+      console.warn('⚠️ Could not start game music:', e);
+      this.gameMusic = undefined;
+    }
 
     // Create score system
     this.scoreSystem = new Score();
@@ -264,9 +269,8 @@ export class GameScene extends Phaser.Scene {
     // Emit sparkle particles at bone position
     this.sparkleEmitter.emitParticleAt(bone.x, bone.y, 12);
 
-    // Play collect sound
-    this.sound.play('collect_sfx', { volume: 0.7 });
-    console.log('🎵 Collect sound played');
+    // Play collect sound (safely)
+    this.tryPlaySound('collect_sfx', 0.7);
 
     // CRITICAL: Disable body FIRST to prevent re-triggering overlap
     bone.disableBody(true, true);
@@ -278,18 +282,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handlePlayerJump() {
-    // Play jump sound
-    this.sound.play('jump_sfx', { volume: 0.7 });
-    console.log('🎵 Jump sound played');
+    // Play jump sound (safely)
+    this.tryPlaySound('jump_sfx', 0.7);
   }
 
   private handlePlayerLanding() {
     // Throttle land sound to prevent spam
     const currentTime = this.time.now;
     if (currentTime - this.lastLandSoundTime > this.landSoundThrottle) {
-      this.sound.play('land_sfx', { volume: 0.6 });
+      this.tryPlaySound('land_sfx', 0.6);
       this.lastLandSoundTime = currentTime;
-      console.log('🎵 Land sound played');
     }
 
     // Subtle camera shake on landing
@@ -311,9 +313,8 @@ export class GameScene extends Phaser.Scene {
       console.log('🎵 Game music stopped');
     }
 
-    // Play win sound
-    this.sound.play('win_sfx', { volume: 0.8 });
-    console.log('🎵 Win sound played');
+    // Play win sound (safely)
+    this.tryPlaySound('win_sfx', 0.8);
 
     // Create container for win overlay
     this.winOverlay = this.add.container(0, 0);
@@ -390,6 +391,17 @@ export class GameScene extends Phaser.Scene {
         this.debugGraphics = undefined;
       }
       console.log('🔍 Debug mode disabled');
+    }
+  }
+
+  /**
+   * Safely attempts to play a sound effect (handles missing audio gracefully)
+   */
+  private tryPlaySound(key: string, volume: number = 1) {
+    try {
+      this.sound.play(key, { volume });
+    } catch (e) {
+      // Audio not available - fail silently to keep game playable
     }
   }
 

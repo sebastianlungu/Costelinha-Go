@@ -14,6 +14,11 @@ const config: Phaser.Types.Core.GameConfig = {
   backgroundColor: CANVAS.backgroundColor,
   parent: 'game',
   pixelArt: true, // Enable crisp pixel art rendering (nearest-neighbor filtering)
+  audio: {
+    // Use HTML5 Audio instead of WebAudio to avoid browser autoplay decoding issues
+    // WebAudio cannot decode audio until user gesture, HTML5 Audio handles this gracefully
+    disableWebAudio: true,
+  },
   physics: {
     default: 'arcade',
     arcade: {

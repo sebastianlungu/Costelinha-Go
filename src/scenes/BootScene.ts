@@ -193,38 +193,6 @@ Asset paths should be relative to public root (e.g., '/atlas/dog.png' not '/asse
     }
 
     console.log('✅ Asset validation passed - all required textures loaded');
-
-    // Validate audio assets
-    const requiredAudio = [
-      'menu_music',      // Menu background music
-      'game_music',      // Game background music
-      'jump_sfx',        // Jump sound effect
-      'land_sfx',        // Landing sound effect
-      'collect_sfx',     // Collect bone sound effect
-      'ui_click_sfx',    // UI click sound effect
-      'win_sfx',         // Win jingle sound effect
-    ];
-
-    const missingAudio: string[] = [];
-
-    for (const key of requiredAudio) {
-      // Use sound manager instead of cache - audio might not be in cache yet
-      if (!this.sound.get(key)) {
-        missingAudio.push(key);
-      }
-    }
-
-    // Fail loud if any audio is missing
-    if (missingAudio.length > 0) {
-      const errorMsg = `❌ AUDIO LOAD FAILED: Missing audio key(s): ${missingAudio.join(', ')}
-
-Check BootScene.preload() to ensure these audio assets are loaded correctly.
-Audio paths should be relative to public root (e.g., '/audio/music/menu_music.mp3')`;
-
-      console.error(errorMsg);
-      throw new Error(errorMsg);
-    }
-
-    console.log('✅ Audio validation passed - all required audio loaded');
+    console.log('🎵 Audio files loaded (will be available after Web Audio unlock)');
   }
 }

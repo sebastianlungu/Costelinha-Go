@@ -19,31 +19,21 @@ export class MenuScene extends Phaser.Scene {
   create() {
     console.log('🎮 MenuScene created');
 
-    // Create menu music (don't play yet - wait for user interaction)
-    this.menuMusic = this.sound.add('menu_music', {
-      loop: true,
-      volume: 0.3,
-    });
+    // Try to create menu music (may fail if audio didn't load due to browser restrictions)
+    try {
+      this.menuMusic = this.sound.add('menu_music', {
+        loop: true,
+        volume: 0.3,
+      });
+      console.log('🎵 Menu music created successfully');
+    } catch (e) {
+      console.warn('⚠️ Could not create menu music - audio may not be available:', e);
+      this.menuMusic = undefined;
+    }
 
     // Add audio unlock handler for browser autoplay restrictions
     this.input.once('pointerdown', () => {
-      // Unlock Web Audio on first user interaction
-      if (this.sound.context && this.sound.context.state === 'suspended') {
-        this.sound.context.resume().then(() => {
-          console.log('🎵 Web Audio unlocked');
-          const music = this.sound.get('menu_music') as Phaser.Sound.WebAudioSound;
-          if (music && !music.isPlaying) {
-            music.play({ loop: true, volume: 0.3 });
-            this.isAudioUnlocked = true;
-          }
-        });
-      } else {
-        const music = this.sound.get('menu_music') as Phaser.Sound.WebAudioSound;
-        if (music && !music.isPlaying) {
-          music.play({ loop: true, volume: 0.3 });
-          this.isAudioUnlocked = true;
-        }
-      }
+      this.tryPlayMenuMusic();
       console.log('🎵 Audio unlock triggered on first click');
     });
 
@@ -110,9 +100,8 @@ export class MenuScene extends Phaser.Scene {
       'PLAY',
       () => {
         console.log('🎮 Starting GameScene...');
-        // Play UI click sound
-        this.sound.play('ui_click_sfx', { volume: 0.6 });
-        console.log('🎵 UI click sound played');
+        // Play UI click sound (safely)
+        this.tryPlaySound('ui_click_sfx', 0.6);
 
         // Stop menu music before transitioning
         if (this.menuMusic) {
@@ -145,9 +134,8 @@ export class MenuScene extends Phaser.Scene {
     // Space key handler (alternative to button click)
     this.input.keyboard?.on('keydown-SPACE', () => {
       console.log('🎮 Starting GameScene...');
-      // Play UI click sound
-      this.sound.play('ui_click_sfx', { volume: 0.6 });
-      console.log('🎵 UI click sound played');
+      // Play UI click sound (safely)
+      this.tryPlaySound('ui_click_sfx', 0.6);
 
       // Stop menu music before transitioning
       if (this.menuMusic) {
@@ -157,6 +145,33 @@ export class MenuScene extends Phaser.Scene {
 
       this.scene.start('GameScene');
     });
+  }
+
+  /**
+   * Safely attempts to play menu music after audio unlock
+   */
+  private tryPlayMenuMusic() {
+    try {
+      if (this.menuMusic && !this.menuMusic.isPlaying) {
+        this.menuMusic.play();
+        this.isAudioUnlocked = true;
+        console.log('🎵 Menu music playing');
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not play menu music:', e);
+    }
+  }
+
+  /**
+   * Safely attempts to play a sound effect
+   */
+  private tryPlaySound(key: string, volume: number = 1) {
+    try {
+      this.sound.play(key, { volume });
+      console.log(`🎵 ${key} played`);
+    } catch (e) {
+      console.warn(`⚠️ Could not play ${key}:`, e);
+    }
   }
 
   /**
