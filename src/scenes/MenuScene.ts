@@ -19,6 +19,9 @@ export class MenuScene extends Phaser.Scene {
   create() {
     console.log('🎮 MenuScene created');
 
+    // Debug: Log initial audio state
+    console.log(`🎵 Audio system state - locked: ${this.sound.locked}, mute: ${this.sound.mute}, volume: ${this.sound.volume}`);
+
     // Try to create menu music (may fail if audio didn't load due to browser restrictions)
     try {
       this.menuMusic = this.sound.add('menu_music', {
@@ -31,10 +34,41 @@ export class MenuScene extends Phaser.Scene {
       this.menuMusic = undefined;
     }
 
-    // Add audio unlock handler for browser autoplay restrictions
-    this.input.once('pointerdown', () => {
+    // Handle audio unlock properly using Phaser's recommended pattern
+    if (this.sound.locked) {
+      console.log('🎵 Audio is locked, waiting for user gesture to unlock...');
+      // Listen for Phaser's unlocked event (fires after user gesture unlocks audio)
+      this.sound.once('unlocked', () => {
+        console.log('🎵 Audio unlocked by Phaser!');
+        this.isAudioUnlocked = true;
+        this.tryPlayMenuMusic();
+      });
+    } else {
+      // Audio already unlocked (rare, but possible)
+      console.log('🎵 Audio already unlocked, playing immediately');
+      this.isAudioUnlocked = true;
       this.tryPlayMenuMusic();
-      console.log('🎵 Audio unlock triggered on first click');
+    }
+
+    // Also add pointerdown as backup unlock trigger
+    this.input.once('pointerdown', () => {
+      console.log('🎵 First click detected - attempting audio unlock');
+      if (!this.isAudioUnlocked) {
+        // Resume audio context if needed (for WebAudio)
+        if (this.sound.context && this.sound.context.state === 'suspended') {
+          console.log('🎵 Audio context suspended, resuming...');
+          this.sound.context.resume().then(() => {
+            console.log('🎵 Audio context resumed successfully');
+            this.isAudioUnlocked = true;
+            this.tryPlayMenuMusic();
+          }).catch((err: Error) => {
+            console.warn('⚠️ Failed to resume audio context:', err);
+          });
+        } else {
+          this.isAudioUnlocked = true;
+          this.tryPlayMenuMusic();
+        }
+      }
     });
 
     // Display menu background scaled to fit 1280x720 canvas
@@ -151,11 +185,19 @@ export class MenuScene extends Phaser.Scene {
    * Safely attempts to play menu music after audio unlock
    */
   private tryPlayMenuMusic() {
+    console.log(`🎵 tryPlayMenuMusic called - menuMusic exists: ${!!this.menuMusic}, isPlaying: ${this.menuMusic?.isPlaying}, locked: ${this.sound.locked}`);
     try {
       if (this.menuMusic && !this.menuMusic.isPlaying) {
         this.menuMusic.play();
-        this.isAudioUnlocked = true;
-        console.log('🎵 Menu music playing');
+        console.log(`🎵 Menu music play() called - isPlaying now: ${this.menuMusic.isPlaying}`);
+
+        // Additional debug: check volume and mute state
+        const soundConfig = (this.menuMusic as Phaser.Sound.BaseSound & { volume?: number; mute?: boolean });
+        console.log(`🎵 Music state - volume: ${soundConfig.volume}, mute: ${soundConfig.mute}`);
+      } else if (this.menuMusic?.isPlaying) {
+        console.log('🎵 Menu music already playing, skipping');
+      } else {
+        console.warn('⚠️ Menu music object is undefined');
       }
     } catch (e) {
       console.warn('⚠️ Could not play menu music:', e);

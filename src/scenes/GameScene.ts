@@ -32,18 +32,11 @@ export class GameScene extends Phaser.Scene {
     // Reset win state
     this.isGameWon = false;
 
-    // Start game background music (with error handling for browser restrictions)
-    try {
-      this.gameMusic = this.sound.add('game_music', {
-        loop: true,
-        volume: 0.35,
-      });
-      this.gameMusic.play();
-      console.log('🎵 Game music started');
-    } catch (e) {
-      console.warn('⚠️ Could not start game music:', e);
-      this.gameMusic = undefined;
-    }
+    // Debug: Log audio state when entering GameScene
+    console.log(`🎵 GameScene audio state - locked: ${this.sound.locked}, mute: ${this.sound.mute}, volume: ${this.sound.volume}`);
+
+    // Start game background music (with proper unlock handling)
+    this.startGameMusic();
 
     // Create score system
     this.scoreSystem = new Score();
@@ -395,13 +388,55 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Starts game music with proper audio unlock handling
+   */
+  private startGameMusic() {
+    try {
+      this.gameMusic = this.sound.add('game_music', {
+        loop: true,
+        volume: 0.35,
+      });
+      console.log('🎵 Game music object created');
+
+      // Check if audio is locked
+      if (this.sound.locked) {
+        console.log('🎵 Audio still locked in GameScene, waiting for unlock...');
+        this.sound.once('unlocked', () => {
+          console.log('🎵 Audio unlocked in GameScene, starting music');
+          this.tryPlayGameMusic();
+        });
+      } else {
+        // Audio already unlocked (normal case after menu interaction)
+        console.log('🎵 Audio unlocked, starting game music immediately');
+        this.tryPlayGameMusic();
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not create game music:', e);
+      this.gameMusic = undefined;
+    }
+  }
+
+  /**
+   * Attempts to play game music with debug logging
+   */
+  private tryPlayGameMusic() {
+    if (this.gameMusic && !this.gameMusic.isPlaying) {
+      this.gameMusic.play();
+      console.log(`🎵 Game music play() called - isPlaying: ${this.gameMusic.isPlaying}`);
+    } else if (this.gameMusic?.isPlaying) {
+      console.log('🎵 Game music already playing');
+    }
+  }
+
+  /**
    * Safely attempts to play a sound effect (handles missing audio gracefully)
    */
   private tryPlaySound(key: string, volume: number = 1) {
     try {
       this.sound.play(key, { volume });
+      console.log(`🎵 SFX played: ${key} at volume ${volume}`);
     } catch (e) {
-      // Audio not available - fail silently to keep game playable
+      console.warn(`⚠️ Could not play SFX ${key}:`, e);
     }
   }
 

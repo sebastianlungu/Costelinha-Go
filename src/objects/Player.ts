@@ -56,23 +56,30 @@ export class Player extends Phaser.Events.EventEmitter {
       return;
     }
 
-    // Handle horizontal movement
+    // Use body.blocked.down for more stable ground detection (less flickering than touching.down)
+    const isGrounded = body.blocked.down || body.touching.down;
+
+    // Handle horizontal movement - use velocity for responsive ground control, acceleration for air
     const isLeftDown = this.cursors.left.isDown || this.keyA.isDown;
     const isRightDown = this.cursors.right.isDown || this.keyD.isDown;
 
     if (isLeftDown) {
+      // Direct velocity for responsive ground movement, acceleration helps in air
+      this.sprite.setVelocityX(-PLAYER.speed);
       this.sprite.setAccelerationX(-PLAYER.acceleration);
       this.sprite.flipX = false; // Face left (original sprite direction)
     } else if (isRightDown) {
+      this.sprite.setVelocityX(PLAYER.speed);
       this.sprite.setAccelerationX(PLAYER.acceleration);
       this.sprite.flipX = true; // Face right (flip sprite horizontally)
     } else {
       this.sprite.setAccelerationX(0);
+      // Let drag handle deceleration naturally
     }
 
     // Handle jump
     const isJumpPressed = this.cursors.up.isDown || this.cursors.space.isDown;
-    if (isJumpPressed && body.touching.down) {
+    if (isJumpPressed && isGrounded) {
       this.sprite.setVelocityY(PLAYER.jumpVelocity);
 
       // Emit dust particles at player's feet on jump
@@ -88,8 +95,6 @@ export class Player extends Phaser.Events.EventEmitter {
     if (time < this.landingLockUntil) {
       return; // Skip animation updates during landing lock
     }
-
-    const isGrounded = body.touching.down;
     const isMoving = Math.abs(body.velocity.x) > 10;
 
     // Detect landing (transition from air to ground)

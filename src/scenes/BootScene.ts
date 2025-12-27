@@ -34,26 +34,22 @@ export class BootScene extends Phaser.Scene {
 
     // Load parallax background layers (Kenney assets)
     this.load.image('bg_sky', '/tiles/Backgrounds/tile_0000.png'); // Light blue sky tile
-    // TEMPORARILY DISABLED - Assets not in current build
-    // this.load.image('bg_clouds_far', '/backgrounds/cloud1.png'); // Far clouds
+    this.load.image('bg_clouds_far', '/backgrounds/cloud1.png'); // Far clouds
     this.load.image('bg_clouds_near', '/backgrounds/cloud2.png'); // Near clouds
-    // this.load.image('bg_sun', '/backgrounds/sun.png'); // Sun decoration
+    this.load.image('bg_sun', '/backgrounds/sun.png'); // Sun decoration
     this.load.image('bg_grass_decor', '/backgrounds/grass1.png'); // Foreground grass decoration
 
     // Load platform tiles (Kenney pixel platformer - 21x21px tiles)
-    // TEMPORARILY DISABLED - Path mismatch (exists in assets/tiles/ not /tiles/)
-    // this.load.image('tile_grass_top', '/tiles/tile_0001.png'); // Brown grass top
+    this.load.image('tile_grass_top', '/tiles/tile_0001.png'); // Brown grass top
     this.load.image('tile_dirt', '/tiles/tile_0002.png'); // Brown dirt
     this.load.image('tile_dirt_alt', '/tiles/tile_0003.png'); // Brown dirt variant
 
     // Load particle effects (Kenney particle pack)
-    // TEMPORARILY DISABLED - Assets not in current build
-    // this.load.image('particle_star', '/particles/star_05.png'); // Sparkle effect for collectibles
-    // this.load.image('particle_dust', '/particles/smoke_03.png'); // Dust effect for jump/land
+    this.load.image('particle_star', '/particles/star_05.png'); // Sparkle effect for collectibles
+    this.load.image('particle_dust', '/particles/smoke_03.png'); // Dust effect for jump/land
 
     // Load UI icons
-    // TEMPORARILY DISABLED - Asset not in current build
-    // this.load.image('ui_star', '/ui/star.png'); // Star icon for score display
+    this.load.image('ui_star', '/ui/star.png'); // Star icon for score display
 
     // Load UI button assets (from Kenney UI pack)
     this.load.image('ui_button_rectangle', '/ui/Default/button_rectangle_depth_border.png'); // Main button
@@ -151,19 +147,19 @@ export class BootScene extends Phaser.Scene {
       'bone',             // Bone collectible
       // Parallax background layers
       'bg_sky',           // Sky tile
-      // 'bg_clouds_far',  // DISABLED - asset not in current build
+      'bg_clouds_far',    // Far clouds
       'bg_clouds_near',   // Near clouds
-      // 'bg_sun',         // DISABLED - asset not in current build
+      'bg_sun',           // Sun decoration
       'bg_grass_decor',   // Foreground grass
       // Platform tiles (Kenney pixel platformer)
-      // 'tile_grass_top', // DISABLED - path mismatch
+      'tile_grass_top',   // Grass top tile
       'tile_dirt',        // Dirt tile
       'tile_dirt_alt',    // Dirt variant tile
       // Particle effects
-      // 'particle_star',  // DISABLED - asset not in current build
-      // 'particle_dust',  // DISABLED - asset not in current build
+      'particle_star',    // Sparkle effect for collectibles
+      'particle_dust',    // Dust effect for jump/land
       // UI icons
-      // 'ui_star',        // DISABLED - asset not in current build
+      'ui_star',          // Star icon for score display
       // UI buttons and controls
       'ui_button_rectangle', // Rectangle button
       'ui_button_square',    // Square button
