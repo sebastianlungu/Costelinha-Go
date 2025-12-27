@@ -1,12 +1,19 @@
 import Phaser from 'phaser';
+import { UI_TYPOGRAPHY } from '../config/gameConfig';
 
 export class BootScene extends Phaser.Scene {
+  private fontLoaded: boolean = false;
+  private assetsLoaded: boolean = false;
+
   constructor() {
     super({ key: 'BootScene' });
   }
 
   preload() {
     console.log('🎨 Loading assets...');
+
+    // Start font loading in parallel with asset loading
+    this.loadFont();
 
     // Load dog animation spritesheet (all frames in a single image)
     // Frame order: idle1, idle2, idle3, idle4, walk1, walk2, walk3, jump, airborne, falling
@@ -50,6 +57,22 @@ export class BootScene extends Phaser.Scene {
     this.load.image('ui_arrow_left', '/ui/arrowLeft.png'); // Left arrow
     this.load.image('ui_arrow_right', '/ui/arrowRight.png'); // Right arrow
 
+    // Load tilemap for heart sprites (18x18 tiles, 20 columns, 9 rows)
+    // Hearts are at: full heart (4,0), half heart (5,0), empty heart (6,0)
+    this.load.spritesheet('tilemap_packed', '/Tilemap/tilemap_packed.png', {
+      frameWidth: 18,
+      frameHeight: 18,
+    });
+
+    // Load enemy sprites (24x24 tiles, 9 columns, 3 rows)
+    // Row 0: Blue robots (frames 0-8) - used for GroundPatrol
+    // Row 1: Green aliens (frames 9-17) - used for Flyer
+    // Row 2: Pink creatures (frames 18-26) - used for Hopper
+    this.load.spritesheet('enemies', '/Tilemap/tilemap-characters_packed.png', {
+      frameWidth: 24,
+      frameHeight: 24,
+    });
+
     // Load audio assets
     console.log('🎵 Loading audio assets...');
 
@@ -72,6 +95,9 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
+    // Mark assets as loaded (Phaser calls create after preload completes)
+    this.assetsLoaded = true;
+
     // FAIL-LOUD ASSET VALIDATION
     this.validateAssets();
 
@@ -120,10 +146,68 @@ export class BootScene extends Phaser.Scene {
     });
 
     console.log('✅ Assets loaded and validated');
-    console.log('🎮 Starting MenuScene...');
 
-    // Start MenuScene
-    this.scene.start('MenuScene');
+    // Try to proceed to next scene if font is also ready
+    this.tryProceedToMenu();
+  }
+
+  /**
+   * Loads the pixel font using the CSS Font Loading API.
+   * This ensures the font is fully loaded before Phaser creates text objects.
+   */
+  private loadFont() {
+    console.log('🎨 Loading pixel font...');
+
+    // Get font family name from config (without quotes for the FontFace API)
+    const fontFamily = UI_TYPOGRAPHY.fontFamilyRaw;
+
+    // Check if CSS Font Loading API is available
+    if (document.fonts && document.fonts.load) {
+      // Use CSS Font Loading API to wait for font to be ready
+      document.fonts.load(`16px "${fontFamily}"`).then(() => {
+        console.log('✅ Pixel font loaded via CSS Font Loading API');
+        this.fontLoaded = true;
+        document.body.classList.add('fonts-loaded');
+        this.tryProceedToMenu();
+      }).catch((err) => {
+        console.warn('⚠️ CSS Font Loading API failed, using fallback:', err);
+        // Fallback: assume font is loaded after a short delay
+        this.time.delayedCall(500, () => {
+          this.fontLoaded = true;
+          this.tryProceedToMenu();
+        });
+      });
+    } else {
+      // Fallback for browsers without CSS Font Loading API
+      console.log('⚠️ CSS Font Loading API not available, using fallback');
+      // Create an invisible element with the font to trigger loading
+      const testElement = document.createElement('span');
+      testElement.style.fontFamily = `"${fontFamily}", monospace`;
+      testElement.style.fontSize = '1px';
+      testElement.style.position = 'absolute';
+      testElement.style.left = '-9999px';
+      testElement.textContent = 'Font loading test';
+      document.body.appendChild(testElement);
+
+      // Wait a short time for font to load
+      this.time.delayedCall(500, () => {
+        document.body.removeChild(testElement);
+        this.fontLoaded = true;
+        this.tryProceedToMenu();
+      });
+    }
+  }
+
+  /**
+   * Attempts to proceed to the MenuScene once both assets and font are loaded.
+   */
+  private tryProceedToMenu() {
+    if (this.assetsLoaded && this.fontLoaded) {
+      console.log('🎮 Both assets and font loaded, starting MenuScene...');
+      this.scene.start('MenuScene');
+    } else {
+      console.log(`⏳ Waiting... Assets: ${this.assetsLoaded}, Font: ${this.fontLoaded}`);
+    }
   }
 
   /**
@@ -159,6 +243,10 @@ export class BootScene extends Phaser.Scene {
       'ui_arrow_up',         // Up arrow
       'ui_arrow_left',       // Left arrow
       'ui_arrow_right',      // Right arrow
+      // Tilemap for hearts
+      'tilemap_packed',      // Tilemap with heart sprites
+      // Enemy sprites
+      'enemies',             // Enemy character spritesheet
     ];
 
     // Check each required texture exists in cache

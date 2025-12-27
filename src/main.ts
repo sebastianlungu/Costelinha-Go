@@ -2,8 +2,13 @@ import Phaser from 'phaser';
 import { CANVAS, PHYSICS } from './config/gameConfig';
 import { BootScene } from './scenes/BootScene';
 import { MenuScene } from './scenes/MenuScene';
+import { LevelSelectScene } from './scenes/LevelSelectScene';
+import { SettingsScene } from './scenes/SettingsScene';
 import { GameScene } from './scenes/GameScene';
 import { HudScene } from './scenes/HudScene';
+
+// Import font CSS - Vite will bundle this for production
+import './styles/fonts.css';
 
 console.log('🎮 Costelinha Runner starting...');
 
@@ -27,7 +32,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: PHYSICS.debugShowBody,
     },
   },
-  scene: [BootScene, MenuScene, GameScene, HudScene],
+  scene: [BootScene, MenuScene, LevelSelectScene, SettingsScene, GameScene, HudScene],
 };
 
 const game = new Phaser.Game(config);

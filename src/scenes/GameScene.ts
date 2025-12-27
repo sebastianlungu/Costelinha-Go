@@ -1,14 +1,34 @@
 import Phaser from 'phaser';
-import { WORLD, PLATFORMS, DEPTHS, PLAYER, COLLECTIBLES, CAMERA } from '../config/gameConfig';
+import { WORLD, PLATFORMS, DEPTHS, PLAYER, COLLECTIBLES, CAMERA, UI_TYPOGRAPHY, UI_COLORS, UI_SPACING, UI_LAYOUT, HEARTS, MOVING_PLATFORMS, ONE_WAY_PLATFORMS, ENEMIES } from '../config/gameConfig';
 import { Player } from '../objects/Player';
 import { Collectible } from '../objects/Collectible';
+import { Heart } from '../objects/Heart';
+import { MovingPlatform } from '../objects/MovingPlatform';
+import { OneWayPlatform } from '../objects/OneWayPlatform';
 import { Score } from '../systems/Score';
+import { getGameState } from '../state/GameState';
+import { Enemy, EnemyDefinition } from '../objects/Enemy';
+import { GroundPatrol } from '../objects/enemies/GroundPatrol';
+import { Hopper } from '../objects/enemies/Hopper';
+import { Flyer } from '../objects/enemies/Flyer';
+import { getLevelDefinition, LevelDefinition, isValidLevelIndex } from '../data/LevelDefinitions';
+import { THEME_ASSETS, ThemeId } from '../data/AssetManifest';
+
+interface GameSceneData {
+  levelIndex?: number;
+}
 
 export class GameScene extends Phaser.Scene {
+  // Level data
+  private levelDefinition?: LevelDefinition;
+  private levelIndex: number = 1;
+  private useLevelDefinition: boolean = false; // Toggle between old config and new level system
   private platformGroup!: Phaser.Physics.Arcade.StaticGroup;
   private player!: Player;
   private boneGroup!: Phaser.Physics.Arcade.Group;
   private collectibles: Collectible[] = [];
+  private heartGroup!: Phaser.Physics.Arcade.Group;
+  private hearts: Heart[] = [];
   private scoreSystem!: Score;
   private winOverlay?: Phaser.GameObjects.Container;
   private isGameWon: boolean = false;
@@ -22,15 +42,84 @@ export class GameScene extends Phaser.Scene {
   private lastLandSoundTime: number = 0;
   private landSoundThrottle: number = 200; // Minimum ms between land sounds
 
+  // Moving and one-way platforms
+  private movingPlatforms: MovingPlatform[] = [];
+  private movingPlatformGroup!: Phaser.Physics.Arcade.Group;
+  private oneWayPlatforms: OneWayPlatform[] = [];
+  private oneWayPlatformGroup!: Phaser.Physics.Arcade.Group;
+  private currentRidingPlatform: MovingPlatform | null = null;
+
+  // Enemy system
+  private enemies: Enemy[] = [];
+  private enemyGroup!: Phaser.Physics.Arcade.Group;
+
+  // Damage system
+  private isInvulnerable: boolean = false;
+  private invulnerabilityDuration: number = 1000; // 1 second of i-frames
+  private isGameOver: boolean = false;
+  private gameOverOverlay?: Phaser.GameObjects.Container;
+  private levelCompleteOverlay?: Phaser.GameObjects.Container;
+  private checkpointHP: number = 5; // HP at level start for restart
+
+  // Flag for reachFlag completion goal (level 10)
+  private flagSprite?: Phaser.Physics.Arcade.Sprite;
+
   constructor() {
     super({ key: 'GameScene' });
+  }
+
+  init(data?: GameSceneData): void {
+    // Get level index from scene data or GameState
+    const gameState = getGameState();
+
+    // Check if we're being called with a level index (from level select or next level)
+    if (data?.levelIndex !== undefined) {
+      this.levelIndex = data.levelIndex;
+      this.useLevelDefinition = true;
+    } else if (gameState.selectedLevelIndex > 0) {
+      // Use selected level from GameState
+      this.levelIndex = gameState.selectedLevelIndex;
+      this.useLevelDefinition = true;
+    } else {
+      // Fall back to old config-based behavior
+      this.useLevelDefinition = false;
+      this.levelIndex = 1;
+    }
+
+    // Validate level index
+    if (this.useLevelDefinition && !isValidLevelIndex(this.levelIndex)) {
+      console.warn(`Invalid level index ${this.levelIndex}, defaulting to 1`);
+      this.levelIndex = 1;
+    }
+
+    console.log(`GameScene init: Level ${this.levelIndex}, useLevelDefinition: ${this.useLevelDefinition}`);
   }
 
   create() {
     console.log('🎮 GameScene created');
 
-    // Reset win state
+    // Reset game state flags
     this.isGameWon = false;
+    this.isGameOver = false;
+    this.isInvulnerable = false;
+
+    // Clear arrays for scene restart
+    this.movingPlatforms = [];
+    this.oneWayPlatforms = [];
+    this.collectibles = [];
+    this.hearts = [];
+    this.enemies = [];
+
+    // Load level definition if using new system
+    if (this.useLevelDefinition) {
+      this.levelDefinition = getLevelDefinition(this.levelIndex);
+      console.log(`Loaded level: ${this.levelDefinition.levelName} (${this.levelDefinition.theme})`);
+    }
+
+    // Save checkpoint HP for restart functionality
+    const gameState = getGameState();
+    gameState.saveLevelCheckpoint();
+    this.checkpointHP = gameState.currentHP;
 
     // Debug: Log audio state when entering GameScene
     console.log(`🎵 GameScene audio state - locked: ${this.sound.locked}, mute: ${this.sound.mute}, volume: ${this.sound.volume}`);
@@ -38,28 +127,52 @@ export class GameScene extends Phaser.Scene {
     // Start game background music (with proper unlock handling)
     this.startGameMusic();
 
-    // Create score system
-    this.scoreSystem = new Score();
+    // Create score system with bone count from level definition
+    const totalBones = this.levelDefinition ? this.levelDefinition.bones.length : COLLECTIBLES.count;
+    this.scoreSystem = new Score(totalBones);
 
-    // Launch HudScene in parallel with the score system
-    this.scene.launch('HudScene', { scoreSystem: this.scoreSystem });
+    // Launch HudScene with level info
+    const levelName = this.levelDefinition ? this.levelDefinition.levelName : 'Grasslands';
+    this.scene.launch('HudScene', {
+      scoreSystem: this.scoreSystem,
+      currentHP: gameState.currentHP,
+      maxHP: gameState.maxHP,
+      level: this.levelIndex,
+      levelName: levelName,
+    });
 
     // Set world bounds
     this.physics.world.setBounds(0, 0, WORLD.width, WORLD.height);
 
-    // Create parallax background layers
-    this.createParallaxBackground();
+    // Create background - themed if using level definition
+    if (this.levelDefinition) {
+      this.createThemedBackground(this.levelDefinition.theme);
+    } else {
+      this.createParallaxBackground();
+    }
 
     // Create static physics group for platforms
     this.platformGroup = this.physics.add.staticGroup();
 
-    // Create all platforms from gameConfig.PLATFORMS array using tiles
-    PLATFORMS.forEach((platformConfig, index) => {
-      this.createTiledPlatform(platformConfig);
-    });
+    // Create platforms - from level definition or config
+    if (this.levelDefinition) {
+      this.levelDefinition.platforms.forEach(platformConfig => {
+        this.createTiledPlatform(platformConfig);
+      });
+    } else {
+      PLATFORMS.forEach((platformConfig, index) => {
+        this.createTiledPlatform(platformConfig);
+      });
+    }
 
     // Refresh the static group to ensure physics bodies are updated
     this.platformGroup.refresh();
+
+    // Create moving platforms
+    this.createMovingPlatforms();
+
+    // Create one-way platforms
+    this.createOneWayPlatforms();
 
     // Camera setup - fixed view initially (no follow yet)
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
@@ -67,8 +180,12 @@ export class GameScene extends Phaser.Scene {
     // Create particle emitters for juice effects
     this.createParticleEmitters();
 
+    // Get player spawn position from level definition or config
+    const spawnX = this.levelDefinition ? this.levelDefinition.playerSpawn.x : PLAYER.spawnX;
+    const spawnY = this.levelDefinition ? this.levelDefinition.playerSpawn.y : PLAYER.spawnY;
+
     // Create player (EXACTLY once per GameScene instance)
-    this.player = new Player(this, PLAYER.spawnX, PLAYER.spawnY, this.dustEmitter);
+    this.player = new Player(this, spawnX, spawnY, this.dustEmitter);
 
     // RUNTIME ASSERTION: Verify only ONE player sprite exists in this scene
     // This catches bugs where player might be created multiple times
@@ -85,6 +202,26 @@ export class GameScene extends Phaser.Scene {
     // Ground detection is handled in Player.update() using sticky velocity-based logic
     this.physics.add.collider(this.player.sprite, this.platformGroup);
 
+    // Add collision between player and moving platforms
+    // Uses custom process callback for "riding" behavior
+    this.physics.add.collider(
+      this.player.sprite,
+      this.movingPlatformGroup,
+      undefined,
+      this.handleMovingPlatformCollision,
+      this
+    );
+
+    // Add collision between player and one-way platforms
+    // Uses custom process callback for pass-through behavior
+    this.physics.add.collider(
+      this.player.sprite,
+      this.oneWayPlatformGroup,
+      undefined,
+      this.handleOneWayPlatformCollision,
+      this
+    );
+
     // Setup smooth camera follow with deadzone
     this.cameras.main.startFollow(this.player.sprite, true, CAMERA.followLerp, CAMERA.followLerp);
     this.cameras.main.setDeadzone(CAMERA.deadzone.width, CAMERA.deadzone.height);
@@ -98,14 +235,18 @@ export class GameScene extends Phaser.Scene {
       allowGravity: false, // Disable gravity for all bones in this group
     });
 
-    // Spawn collectibles at positions from gameConfig
-    COLLECTIBLES.positions.forEach((pos, index) => {
+    // Spawn collectibles at positions from level definition or gameConfig
+    const bonePositions = this.levelDefinition
+      ? this.levelDefinition.bones
+      : COLLECTIBLES.positions;
+
+    bonePositions.forEach((pos) => {
       const collectible = new Collectible(this, pos.x, pos.y);
       this.collectibles.push(collectible);
       this.boneGroup.add(collectible.sprite);
     });
 
-    console.log(`🍖 ${COLLECTIBLES.count} bones spawned`);
+    console.log(`🍖 ${bonePositions.length} bones spawned`);
 
     // Add overlap detection between player and bones
     this.physics.add.overlap(
@@ -115,6 +256,42 @@ export class GameScene extends Phaser.Scene {
       undefined,
       this
     );
+
+    // Create heart group with allowGravity disabled
+    this.heartGroup = this.physics.add.group({
+      allowGravity: false,
+    });
+
+    // Spawn heart collectibles at positions from level definition or gameConfig
+    const heartPositions = this.levelDefinition
+      ? this.levelDefinition.hearts
+      : (HEARTS?.positions || []);
+
+    if (heartPositions.length > 0) {
+      heartPositions.forEach((pos) => {
+        const heart = new Heart(this, pos.x, pos.y);
+        this.heartGroup.add(heart.sprite);
+        this.hearts.push(heart);
+      });
+      console.log(`${heartPositions.length} hearts spawned`);
+    }
+
+    // Add overlap detection between player and hearts
+    this.physics.add.overlap(
+      this.player.sprite,
+      this.heartGroup,
+      this.handleHeartCollect,
+      undefined,
+      this
+    );
+
+    // Create enemies from config
+    this.createEnemies();
+
+    // Create flag if level uses reachFlag goal
+    if (this.levelDefinition?.completionGoal === 'reachFlag' && this.levelDefinition.flagPosition) {
+      this.createFlag();
+    }
 
     // Setup R key for restart
     this.keyR = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R);
@@ -159,6 +336,475 @@ export class GameScene extends Phaser.Scene {
         this.platformGroup.add(tile, true);
       }
     }
+  }
+
+  /**
+   * Creates moving platforms from level definition or config.
+   * Moving platforms carry the player along as they move.
+   */
+  private createMovingPlatforms(): void {
+    // Initialize group for moving platform bodies
+    this.movingPlatformGroup = this.physics.add.group({
+      allowGravity: false,
+    });
+
+    // Get moving platforms from level definition or config
+    const movingPlatformDefs = this.levelDefinition
+      ? this.levelDefinition.movingPlatforms
+      : (MOVING_PLATFORMS || []);
+
+    if (movingPlatformDefs.length === 0) {
+      console.log('No moving platforms defined');
+      return;
+    }
+
+    // Create each moving platform
+    movingPlatformDefs.forEach((config) => {
+      const platform = new MovingPlatform(
+        this,
+        config.x,
+        config.y,
+        config.width,
+        config.axis,
+        config.range,
+        config.speed
+      );
+      this.movingPlatforms.push(platform);
+      this.movingPlatformGroup.add(platform.getBody());
+    });
+
+    console.log(`Created ${this.movingPlatforms.length} moving platforms`);
+  }
+
+  /**
+   * Creates one-way platforms from level definition or config.
+   * Player can jump through from below but lands on top.
+   */
+  private createOneWayPlatforms(): void {
+    // Initialize group for one-way platform bodies
+    this.oneWayPlatformGroup = this.physics.add.group({
+      allowGravity: false,
+    });
+
+    // Get one-way platforms from level definition or config
+    const oneWayPlatformDefs = this.levelDefinition
+      ? this.levelDefinition.oneWayPlatforms
+      : (ONE_WAY_PLATFORMS || []);
+
+    if (oneWayPlatformDefs.length === 0) {
+      console.log('No one-way platforms defined');
+      return;
+    }
+
+    // Create each one-way platform
+    oneWayPlatformDefs.forEach((config) => {
+      const platform = new OneWayPlatform(
+        this,
+        config.x,
+        config.y,
+        config.width
+      );
+      this.oneWayPlatforms.push(platform);
+      this.oneWayPlatformGroup.add(platform.getBody());
+    });
+
+    console.log(`Created ${this.oneWayPlatforms.length} one-way platforms`);
+  }
+
+  /**
+   * Handles collision between player and moving platforms.
+   * Always returns true to allow collision, but tracks riding state.
+   */
+  private handleMovingPlatformCollision(
+    playerSprite: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
+    platformBody: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
+  ): boolean {
+    // Find the MovingPlatform object for this body
+    const platform = this.movingPlatforms.find(p => p.body === platformBody);
+    if (platform) {
+      // Track that we're on a moving platform for the update loop
+      this.currentRidingPlatform = platform;
+    }
+    return true; // Allow collision
+  }
+
+  /**
+   * Handles one-way platform collision.
+   * Returns false to allow pass-through when player is below platform or moving up.
+   */
+  private handleOneWayPlatformCollision(
+    playerSprite: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
+    platformBody: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
+  ): boolean {
+    const player = playerSprite as Phaser.Physics.Arcade.Sprite;
+
+    // Find the OneWayPlatform object for this body
+    const platform = this.oneWayPlatforms.find(p => p.body === platformBody);
+    if (platform) {
+      return platform.checkOneWay(player);
+    }
+    return true; // Fallback to normal collision
+  }
+
+  /**
+   * Creates enemies from level definition or config and sets up collision with player.
+   */
+  private createEnemies(): void {
+    // Initialize enemy group
+    this.enemyGroup = this.physics.add.group({
+      allowGravity: true, // Most enemies need gravity
+    });
+
+    // Get enemy definitions from level definition or config
+    const enemyDefs = this.levelDefinition
+      ? this.levelDefinition.enemies.map(e => ({
+          type: e.type,
+          x: e.x,
+          y: e.y,
+          params: {
+            patrolRange: e.params?.patrolDistance,
+            speed: e.params?.patrolDistance ? 80 : undefined,
+            jumpHeight: e.params?.hopHeight,
+            amplitude: e.params?.amplitude,
+            frequency: e.params?.frequency,
+          },
+        }))
+      : (ENEMIES || []);
+
+    if (enemyDefs.length === 0) {
+      console.log('🦀 No enemies defined');
+      return;
+    }
+
+    // Create each enemy based on type
+    enemyDefs.forEach((enemyDef: EnemyDefinition) => {
+      let enemy: Enemy;
+
+      switch (enemyDef.type) {
+        case 'groundPatrol':
+          enemy = new GroundPatrol(this, enemyDef.x, enemyDef.y, enemyDef.params);
+          break;
+        case 'hopper':
+          enemy = new Hopper(this, enemyDef.x, enemyDef.y, enemyDef.params);
+          break;
+        case 'flyer':
+          enemy = new Flyer(this, enemyDef.x, enemyDef.y, enemyDef.params);
+          break;
+        default:
+          console.warn(`🦀 Unknown enemy type: ${(enemyDef as any).type}`);
+          return;
+      }
+
+      // Add enemy sprite to group and track enemy object
+      this.enemyGroup.add(enemy.sprite);
+      this.enemies.push(enemy);
+    });
+
+    // Add collision between enemies and platforms
+    this.physics.add.collider(this.enemyGroup, this.platformGroup);
+
+    // Add overlap detection between player and enemies for damage
+    this.physics.add.overlap(
+      this.player.sprite,
+      this.enemyGroup,
+      this.handlePlayerDamage,
+      undefined,
+      this
+    );
+
+    console.log(`🦀 Created ${this.enemies.length} enemies`);
+  }
+
+  /**
+   * Handles player taking damage from enemy collision.
+   * Includes invulnerability frames and knockback.
+   */
+  private handlePlayerDamage(
+    playerSprite: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
+    enemySprite: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
+  ): void {
+    // Skip if invulnerable or game is over
+    if (this.isInvulnerable || this.isGameOver || this.isGameWon) return;
+
+    const gameState = getGameState();
+    const player = playerSprite as Phaser.Physics.Arcade.Sprite;
+    const enemy = enemySprite as Phaser.Physics.Arcade.Sprite;
+
+    // Take damage
+    const stillAlive = gameState.takeDamage(1);
+
+    // Emit event for HUD update
+    this.events.emit('hp-changed', gameState.currentHP);
+
+    // Apply knockback
+    this.applyKnockback(player, enemy);
+
+    // Start invulnerability frames
+    this.startInvulnerability();
+
+    // Play damage sound
+    this.tryPlaySound('land_sfx', 0.8); // Reuse land sound for now
+
+    // Camera shake for impact
+    this.cameras.main.shake(150, 0.008);
+
+    // Screen flash for damage feedback
+    this.cameras.main.flash(100, 255, 100, 100, false);
+
+    console.log(`💥 Player hit! HP: ${gameState.currentHP}/${gameState.maxHP}`);
+
+    // Check for game over
+    if (!stillAlive) {
+      this.triggerGameOver();
+    }
+  }
+
+  /**
+   * Applies knockback force to player away from enemy.
+   */
+  private applyKnockback(
+    player: Phaser.Physics.Arcade.Sprite,
+    enemy: Phaser.Physics.Arcade.Sprite
+  ): void {
+    const knockbackForceX = 300;
+    const knockbackForceY = -250;
+
+    // Determine direction (push away from enemy)
+    const direction = player.x < enemy.x ? -1 : 1;
+
+    // Apply knockback velocity
+    player.setVelocity(direction * knockbackForceX, knockbackForceY);
+  }
+
+  /**
+   * Starts invulnerability period with visual flicker effect.
+   */
+  private startInvulnerability(): void {
+    this.isInvulnerable = true;
+
+    // Flicker effect - rapid alpha changes
+    this.tweens.add({
+      targets: this.player.sprite,
+      alpha: { from: 0.3, to: 1 },
+      duration: 100,
+      repeat: 9,
+      yoyo: true,
+    });
+
+    // End invulnerability after duration
+    this.time.delayedCall(this.invulnerabilityDuration, () => {
+      this.isInvulnerable = false;
+      this.player.sprite.alpha = 1; // Ensure full alpha
+      console.log('🐕 Invulnerability ended');
+    });
+  }
+
+  /**
+   * Triggers game over state.
+   */
+  private triggerGameOver(): void {
+    this.isGameOver = true;
+
+    console.log('❌ GAME OVER');
+
+    // Stop player movement
+    this.player.sprite.setVelocity(0, 0);
+    this.player.sprite.setAcceleration(0, 0);
+
+    // Stop game music
+    if (this.gameMusic) {
+      this.gameMusic.stop();
+    }
+
+    // Show game over overlay after a short delay
+    this.time.delayedCall(500, () => {
+      this.showGameOverOverlay();
+    });
+  }
+
+  /**
+   * Shows the game over overlay with restart options.
+   */
+  private showGameOverOverlay(): void {
+    // Create container for game over overlay
+    this.gameOverOverlay = this.add.container(0, 0);
+    this.gameOverOverlay.setScrollFactor(0); // Fixed to camera
+
+    // Get camera center for positioning
+    const centerX = this.cameras.main.width / 2;
+    const centerY = this.cameras.main.height / 2;
+
+    // Semi-transparent dark background
+    const overlay = this.add.rectangle(
+      centerX,
+      centerY,
+      this.cameras.main.width,
+      this.cameras.main.height,
+      0x000000,
+      0.8
+    );
+
+    // "GAME OVER" title
+    const gameOverText = this.add.text(centerX, centerY - 80, 'GAME OVER', {
+      fontFamily: UI_TYPOGRAPHY.fontFamily,
+      fontSize: UI_TYPOGRAPHY.sizeXXL,
+      color: UI_COLORS.danger,
+      stroke: UI_COLORS.backgroundDark,
+      strokeThickness: 6,
+    });
+    gameOverText.setOrigin(0.5, 0.5);
+
+    // Pulse animation for title
+    this.tweens.add({
+      targets: gameOverText,
+      scale: { from: 1, to: 1.05 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // Button dimensions
+    const buttonWidth = 200;
+    const buttonHeight = 50;
+    const buttonSpacing = 20;
+
+    // RESTART button
+    const restartButton = this.createOverlayButton(
+      centerX,
+      centerY + 20,
+      buttonWidth,
+      buttonHeight,
+      'RESTART',
+      () => this.restartLevel()
+    );
+
+    // MENU button
+    const menuButton = this.createOverlayButton(
+      centerX,
+      centerY + 20 + buttonHeight + buttonSpacing,
+      buttonWidth,
+      buttonHeight,
+      'MENU',
+      () => this.returnToMenu()
+    );
+
+    // Add all elements to container
+    this.gameOverOverlay.add([overlay, gameOverText, ...restartButton, ...menuButton]);
+
+    // Set depth above everything
+    this.gameOverOverlay.setDepth(DEPTHS.debug + 1);
+
+    // Fade in effect
+    this.gameOverOverlay.setAlpha(0);
+    this.tweens.add({
+      targets: this.gameOverOverlay,
+      alpha: 1,
+      duration: 300,
+      ease: 'Power2',
+    });
+  }
+
+  /**
+   * Creates a styled button with hover effects for overlays.
+   */
+  private createOverlayButton(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    label: string,
+    onClick: () => void
+  ): Phaser.GameObjects.GameObject[] {
+    // Button shadow
+    const shadow = this.add.rectangle(
+      x + UI_LAYOUT.shadowMedium,
+      y + UI_LAYOUT.shadowMedium,
+      width,
+      height,
+      Phaser.Display.Color.HexStringToColor(UI_COLORS.backgroundDark).color,
+      0.6
+    );
+
+    // Button background
+    const bg = this.add.rectangle(
+      x,
+      y,
+      width,
+      height,
+      Phaser.Display.Color.HexStringToColor(UI_COLORS.primary).color,
+      1
+    );
+    bg.setStrokeStyle(
+      UI_LAYOUT.borderMedium,
+      Phaser.Display.Color.HexStringToColor(UI_COLORS.primaryDark).color
+    );
+
+    // Button text
+    const text = this.add.text(x, y, label, {
+      fontFamily: UI_TYPOGRAPHY.fontFamily,
+      fontSize: UI_TYPOGRAPHY.sizeMedium,
+      color: UI_COLORS.textPrimary,
+      stroke: UI_COLORS.backgroundDark,
+      strokeThickness: 2,
+    });
+    text.setOrigin(0.5, 0.5);
+
+    // Make button interactive
+    bg.setInteractive({ useHandCursor: true });
+
+    // Hover effects
+    bg.on('pointerover', () => {
+      bg.setFillStyle(Phaser.Display.Color.HexStringToColor(UI_COLORS.primaryLight).color);
+      text.setScale(1.05);
+    });
+
+    bg.on('pointerout', () => {
+      bg.setFillStyle(Phaser.Display.Color.HexStringToColor(UI_COLORS.primary).color);
+      text.setScale(1);
+    });
+
+    // Click handler
+    bg.on('pointerdown', () => {
+      this.tryPlaySound('ui_click_sfx', 0.6);
+      onClick();
+    });
+
+    return [shadow, bg, text];
+  }
+
+  /**
+   * Restarts the current level with checkpoint HP.
+   */
+  private restartLevel(): void {
+    console.log('🎮 Restarting level...');
+
+    // Restore HP to checkpoint
+    const gameState = getGameState();
+    gameState.restoreLevelCheckpoint();
+
+    // Stop HudScene
+    this.scene.stop('HudScene');
+
+    // Restart GameScene
+    this.scene.restart();
+  }
+
+  /**
+   * Returns to the main menu with full reset.
+   */
+  private returnToMenu(): void {
+    console.log('🎮 Returning to menu...');
+
+    // Reset HP for new run
+    const gameState = getGameState();
+    gameState.startNewRun();
+
+    // Stop HudScene
+    this.scene.stop('HudScene');
+
+    // Go to menu scene
+    this.scene.start('MenuScene');
   }
 
   private createParticleEmitters() {
@@ -276,6 +922,42 @@ export class GameScene extends Phaser.Scene {
     console.log(`🍖 Collected bone at (${bone.x}, ${bone.y}), score: ${this.scoreSystem.score}/${COLLECTIBLES.count}`);
   }
 
+  private handleHeartCollect(
+    playerSprite: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
+    heartSprite: Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
+  ) {
+    // Find the Heart object that owns this sprite
+    const heart = this.hearts.find(h => h.sprite === heartSprite);
+    if (!heart || heart.isCollected()) return;
+
+    const gameState = getGameState();
+
+    // Only heal if not at max HP
+    if (gameState.currentHP < gameState.maxHP) {
+      const healed = gameState.heal(1);
+
+      if (healed > 0) {
+        // Successfully healed - collect the heart
+        heart.collect();
+
+        // Disable physics body to prevent re-triggering
+        const sprite = heartSprite as Phaser.Physics.Arcade.Sprite;
+        sprite.disableBody(true, false); // Keep visible for animation
+
+        // Emit event for HUD update
+        this.events.emit('hp-changed', gameState.currentHP);
+
+        // Play collect sound (reuse bone collection sound)
+        this.tryPlaySound('collect_sfx', 0.6);
+
+        console.log(`Heart collected! HP: ${gameState.currentHP}/${gameState.maxHP}`);
+      }
+    } else {
+      // Already at max HP - provide visual feedback but don't collect
+      console.log(`Already at max HP (${gameState.currentHP}/${gameState.maxHP}), heart not collected`);
+    }
+  }
+
   private handlePlayerJump() {
     // Play jump sound (safely)
     this.tryPlaySound('jump_sfx', 0.7);
@@ -293,61 +975,301 @@ export class GameScene extends Phaser.Scene {
   }
 
   private checkWinCondition(score: number) {
-    if (score >= COLLECTIBLES.count && !this.isGameWon) {
+    // Only check for collectAllBones goal
+    if (this.levelDefinition?.completionGoal === 'reachFlag') {
+      return; // Flag completion is handled separately
+    }
+
+    const totalBones = this.levelDefinition ? this.levelDefinition.bones.length : COLLECTIBLES.count;
+
+    if (score >= totalBones && !this.isGameWon) {
       this.isGameWon = true;
-      this.showWinOverlay();
-      console.log('✅ You Win!');
+      this.showLevelCompleteOverlay();
+      console.log('All bones collected! Level complete!');
     }
   }
 
-  private showWinOverlay() {
+  /**
+   * Handle flag reached for reachFlag completion goal
+   */
+  private handleFlagReached(): void {
+    if (!this.isGameWon) {
+      this.isGameWon = true;
+      this.showLevelCompleteOverlay();
+      console.log('Flag reached! Level complete!');
+    }
+  }
+
+  /**
+   * Shows level complete overlay with Next Level / Menu buttons
+   */
+  private showLevelCompleteOverlay(): void {
     // Stop game music
     if (this.gameMusic) {
       this.gameMusic.stop();
-      console.log('🎵 Game music stopped');
     }
 
-    // Play win sound (safely)
     this.tryPlaySound('win_sfx', 0.8);
 
-    // Create container for win overlay
-    this.winOverlay = this.add.container(0, 0);
+    // Unlock next level
+    const gameState = getGameState();
+    gameState.unlockNextLevel();
 
-    // Semi-transparent black background covering entire screen
+    // Create overlay container
+    this.levelCompleteOverlay = this.add.container(0, 0);
+    this.levelCompleteOverlay.setDepth(1000);
+    this.levelCompleteOverlay.setScrollFactor(0);
+
+    // Dark background
     const overlay = this.add.rectangle(
       WORLD.width / 2,
       WORLD.height / 2,
       WORLD.width,
       WORLD.height,
       0x000000,
-      0.7
+      0.8
     );
 
-    // "You Win!" text (large, center)
-    const winText = this.add.text(WORLD.width / 2, WORLD.height / 2 - 40, 'You Win!', {
-      fontSize: '64px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
+    // "Level Complete!" text
+    const titleText = this.add.text(WORLD.width / 2, WORLD.height / 2 - 80, 'LEVEL COMPLETE!', {
+      fontFamily: UI_TYPOGRAPHY.fontFamily,
+      fontSize: UI_TYPOGRAPHY.sizeXL,
+      color: UI_COLORS.textAccent,
+      stroke: UI_COLORS.backgroundDark,
       strokeThickness: 6,
     });
-    winText.setOrigin(0.5, 0.5);
+    titleText.setOrigin(0.5, 0.5);
 
-    // "Press R to Restart" instruction (below win text)
-    const restartText = this.add.text(WORLD.width / 2, WORLD.height / 2 + 40, 'Press R to Restart', {
-      fontSize: '32px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4,
+    // Level name
+    const levelName = this.levelDefinition ? this.levelDefinition.levelName : 'Level ' + this.levelIndex;
+    const levelText = this.add.text(WORLD.width / 2, WORLD.height / 2 - 20, levelName, {
+      fontFamily: UI_TYPOGRAPHY.fontFamily,
+      fontSize: UI_TYPOGRAPHY.sizeMedium,
+      color: UI_COLORS.textPrimary,
+      stroke: UI_COLORS.backgroundDark,
+      strokeThickness: 3,
     });
-    restartText.setOrigin(0.5, 0.5);
+    levelText.setOrigin(0.5, 0.5);
 
-    // Add all elements to container
-    this.winOverlay.add([overlay, winText, restartText]);
+    this.levelCompleteOverlay.add([overlay, titleText, levelText]);
 
-    // Set depth to appear above everything
-    this.winOverlay.setDepth(1000);
+    // Create buttons
+    const buttonY = WORLD.height / 2 + 60;
+    const hasNextLevel = this.levelIndex < 10;
+
+    if (hasNextLevel) {
+      const nextBtn = this.createNavigationButton(
+        WORLD.width / 2 - 120,
+        buttonY,
+        'NEXT LEVEL',
+        () => this.goToNextLevel()
+      );
+      this.levelCompleteOverlay.add(nextBtn);
+    }
+
+    const menuBtn = this.createNavigationButton(
+      hasNextLevel ? WORLD.width / 2 + 120 : WORLD.width / 2,
+      buttonY,
+      'MENU',
+      () => this.returnToMenu()
+    );
+    this.levelCompleteOverlay.add(menuBtn);
+  }
+
+  /**
+   * Creates a navigation button for overlays
+   */
+  private createNavigationButton(x: number, y: number, text: string, onClick: () => void): Phaser.GameObjects.Container {
+    const btnContainer = this.add.container(x, y);
+    const btnWidth = 180;
+    const btnHeight = 50;
+
+    // Button shadow
+    const shadow = this.add.rectangle(
+      UI_LAYOUT.shadowMedium,
+      UI_LAYOUT.shadowMedium,
+      btnWidth,
+      btnHeight,
+      Phaser.Display.Color.HexStringToColor(UI_COLORS.backgroundDark).color,
+      0.8
+    );
+
+    // Button background
+    const bg = this.add.rectangle(0, 0, btnWidth, btnHeight, Phaser.Display.Color.HexStringToColor(UI_COLORS.primary).color);
+    bg.setStrokeStyle(3, Phaser.Display.Color.HexStringToColor(UI_COLORS.primaryDark).color);
+
+    // Button text
+    const btnText = this.add.text(0, 0, text, {
+      fontFamily: UI_TYPOGRAPHY.fontFamily,
+      fontSize: UI_TYPOGRAPHY.sizeSmall,
+      color: UI_COLORS.textPrimary,
+    });
+    btnText.setOrigin(0.5, 0.5);
+
+    btnContainer.add([shadow, bg, btnText]);
+
+    // Make interactive
+    bg.setInteractive({ useHandCursor: true })
+      .on('pointerover', () => {
+        bg.setFillStyle(Phaser.Display.Color.HexStringToColor(UI_COLORS.primaryLight).color);
+      })
+      .on('pointerout', () => {
+        bg.setFillStyle(Phaser.Display.Color.HexStringToColor(UI_COLORS.primary).color);
+      })
+      .on('pointerdown', () => {
+        bg.setFillStyle(Phaser.Display.Color.HexStringToColor(UI_COLORS.primaryDark).color);
+      })
+      .on('pointerup', () => {
+        this.tryPlaySound('ui_click_sfx', 0.5);
+        onClick();
+      });
+
+    return btnContainer;
+  }
+
+  /**
+   * Navigate to next level
+   */
+  private goToNextLevel(): void {
+    const gameState = getGameState();
+    const nextLevel = this.levelIndex + 1;
+
+    if (nextLevel <= 10) {
+      gameState.selectedLevelIndex = nextLevel;
+      this.scene.stop('HudScene');
+      this.scene.restart({ levelIndex: nextLevel });
+    } else {
+      // Beat the game!
+      this.returnToMenu();
+    }
+  }
+
+  /**
+   * Creates the flag sprite for reachFlag goal
+   */
+  private createFlag(): void {
+    const flagPos = this.levelDefinition!.flagPosition!;
+
+    // Create flag using a procedural texture
+    const flagWidth = 40;
+    const flagHeight = 60;
+
+    const textureKey = 'flag_texture';
+    if (!this.textures.exists(textureKey)) {
+      const flagGraphics = this.make.graphics({ x: 0, y: 0 });
+      // Flag pole
+      flagGraphics.fillStyle(0x8B4513, 1);
+      flagGraphics.fillRect(0, 0, 6, flagHeight);
+      // Flag fabric (green)
+      flagGraphics.fillStyle(0x00FF00, 1);
+      flagGraphics.fillRect(6, 0, flagWidth - 6, 30);
+      flagGraphics.generateTexture(textureKey, flagWidth, flagHeight);
+      flagGraphics.destroy();
+    }
+
+    this.flagSprite = this.physics.add.sprite(flagPos.x, flagPos.y - flagHeight / 2, textureKey);
+    this.flagSprite.setDepth(DEPTHS.collectibles);
+
+    const body = this.flagSprite.body as Phaser.Physics.Arcade.Body;
+    body.setAllowGravity(false);
+    body.setImmovable(true);
+
+    // Add wave animation
+    this.tweens.add({
+      targets: this.flagSprite,
+      scaleX: { from: 1, to: 1.1 },
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // Add overlap detection for flag
+    this.physics.add.overlap(
+      this.player.sprite,
+      this.flagSprite,
+      () => this.handleFlagReached(),
+      undefined,
+      this
+    );
+
+    console.log(`Flag created at (${flagPos.x}, ${flagPos.y})`);
+  }
+
+  /**
+   * Creates themed background based on level theme
+   */
+  private createThemedBackground(theme: ThemeId): void {
+    const themeAssets = THEME_ASSETS[theme];
+
+    // Set sky color as background
+    this.cameras.main.setBackgroundColor(themeAssets.skyColor);
+
+    // Try to add sky tile if available
+    if (this.textures.exists('bg_sky')) {
+      const skyTile = this.add.tileSprite(0, 0, WORLD.width, WORLD.height, 'bg_sky');
+      skyTile.setOrigin(0, 0);
+      skyTile.setDepth(DEPTHS.background);
+      skyTile.setScrollFactor(0);
+    }
+
+    // Add sun or moon based on theme
+    if (theme === 'night') {
+      if (this.textures.exists('bg_moon')) {
+        const moon = this.add.image(WORLD.width - 150, 100, 'bg_moon');
+        moon.setScale(2);
+        moon.setDepth(DEPTHS.background + 1);
+        moon.setScrollFactor(0.1);
+      }
+    } else if (theme !== 'cave') {
+      if (this.textures.exists('bg_sun')) {
+        const sun = this.add.image(WORLD.width - 150, 100, 'bg_sun');
+        sun.setScale(3);
+        sun.setDepth(DEPTHS.background + 1);
+        sun.setScrollFactor(0.1);
+      }
+    }
+
+    // Add clouds for appropriate themes
+    if (['grasslands', 'forest', 'desert', 'snow', 'beach'].includes(theme)) {
+      if (this.textures.exists('bg_clouds_far')) {
+        // Far clouds
+        const cloudFar1 = this.add.image(200, 120, 'bg_clouds_far');
+        cloudFar1.setScale(2.5);
+        cloudFar1.setDepth(DEPTHS.background + 2);
+        cloudFar1.setScrollFactor(0.2);
+
+        const cloudFar2 = this.add.image(600, 80, 'bg_clouds_far');
+        cloudFar2.setScale(2);
+        cloudFar2.setDepth(DEPTHS.background + 2);
+        cloudFar2.setScrollFactor(0.2);
+
+        const cloudFar3 = this.add.image(1000, 140, 'bg_clouds_far');
+        cloudFar3.setScale(2.8);
+        cloudFar3.setDepth(DEPTHS.background + 2);
+        cloudFar3.setScrollFactor(0.2);
+
+        // Near clouds
+        if (this.textures.exists('bg_clouds_near')) {
+          const cloudNear1 = this.add.image(300, 180, 'bg_clouds_near');
+          cloudNear1.setScale(2);
+          cloudNear1.setDepth(DEPTHS.background + 3);
+          cloudNear1.setScrollFactor(0.4);
+
+          const cloudNear2 = this.add.image(800, 160, 'bg_clouds_near');
+          cloudNear2.setScale(2.3);
+          cloudNear2.setDepth(DEPTHS.background + 3);
+          cloudNear2.setScrollFactor(0.4);
+        }
+      }
+    }
+
+    console.log(`Created ${theme} themed background`);
+  }
+
+  private showWinOverlay() {
+    // Legacy method - redirect to new level complete overlay
+    this.showLevelCompleteOverlay();
   }
 
   private restartGame() {
@@ -375,7 +1297,7 @@ export class GameScene extends Phaser.Scene {
         this.debugGraphics = this.add.graphics();
         this.debugGraphics.setDepth(DEPTHS.debug);
       }
-      this.physics.world.createDebugGraphic(this.debugGraphics);
+      this.physics.world.createDebugGraphic();
       console.log('🔍 Debug mode enabled (hitboxes visible)');
     } else {
       // Disable debug graphics
@@ -453,15 +1375,83 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Don't update game logic if game over
+    if (this.isGameOver) return;
+
+    // Update moving platforms
+    this.updateMovingPlatforms(time, delta);
+
+    // Update enemies
+    this.updateEnemies(time, delta);
+
     // Update player only if game is not won
     if (this.player && !this.isGameWon) {
       this.player.update(time, delta);
+
+      // Apply riding behavior - add platform velocity to player when standing on moving platform
+      this.applyPlatformRidingBehavior();
     }
 
     // Update debug graphics if enabled
     if (this.isDebugEnabled && this.debugGraphics) {
       this.debugGraphics.clear();
       this.physics.world.debugGraphic = this.debugGraphics;
+    }
+  }
+
+  /**
+   * Updates all enemies.
+   */
+  private updateEnemies(time: number, delta: number): void {
+    for (const enemy of this.enemies) {
+      enemy.update(time, delta);
+    }
+  }
+
+  /**
+   * Updates all moving platforms.
+   */
+  private updateMovingPlatforms(time: number, delta: number): void {
+    for (const platform of this.movingPlatforms) {
+      platform.update(time, delta);
+    }
+  }
+
+  /**
+   * Applies platform riding behavior - when player stands on a moving platform,
+   * they should move along with it.
+   */
+  private applyPlatformRidingBehavior(): void {
+    // Reset riding state each frame
+    const wasRiding = this.currentRidingPlatform;
+    this.currentRidingPlatform = null;
+
+    // Check each moving platform to see if player is standing on it
+    for (const platform of this.movingPlatforms) {
+      if (platform.isPlayerStanding(this.player.sprite)) {
+        this.currentRidingPlatform = platform;
+        break;
+      }
+    }
+
+    // If player is on a moving platform, add platform velocity to player position
+    if (this.currentRidingPlatform) {
+      const platformVelocity = this.currentRidingPlatform.getVelocity();
+      const playerBody = this.player.sprite.body as Phaser.Physics.Arcade.Body;
+
+      // For horizontal platforms, we add platform velocity to player's x position
+      // This creates smooth "riding" without affecting player's own movement controls
+      if (platformVelocity.x !== 0) {
+        // Use a small delta-time factor to smooth the movement
+        const dt = 1 / 60; // Assume 60 FPS for now
+        this.player.sprite.x += platformVelocity.x * dt;
+      }
+
+      // For vertical platforms, adjust y position
+      if (platformVelocity.y !== 0) {
+        const dt = 1 / 60;
+        this.player.sprite.y += platformVelocity.y * dt;
+      }
     }
   }
 }

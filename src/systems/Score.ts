@@ -5,9 +5,17 @@ export class Score extends Phaser.Events.EventEmitter {
   private _score: number = 0;
   private _totalBones: number;
 
-  constructor() {
+  constructor(totalBones?: number) {
     super();
-    this._totalBones = COLLECTIBLES.count;
+    this._totalBones = totalBones ?? COLLECTIBLES.count;
+  }
+
+  /**
+   * Set the total number of bones for this level
+   */
+  public setTotalBones(total: number): void {
+    this._totalBones = total;
+    this.emit('score-changed', this._score, this._totalBones);
   }
 
   get score(): number {

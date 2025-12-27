@@ -1,0 +1,25 @@
+/*
+ * Press Start 2P Font
+ * License: Open Font License (OFL)
+ * Source: Google Fonts - https://fonts.google.com/specimen/Press+Start+2P
+ *
+ * Bundled locally to avoid runtime dependency on Google Fonts CDN.
+ * This ensures the font is available immediately without network latency.
+ */
+
+@font-face {
+  font-family: 'Press Start 2P';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/PressStart2P-Regular.woff2') format('woff2'),
+       url('/fonts/PressStart2P-Regular.ttf') format('truetype');
+}
+
+/*
+ * Font loading helper class
+ * Applied to body when font is fully loaded
+ */
+.fonts-loaded {
+  /* This class is added by JavaScript when fonts are loaded */
+}

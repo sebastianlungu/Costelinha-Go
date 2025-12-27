@@ -3,14 +3,13 @@ import {
   CANVAS,
   UI_COLORS,
   UI_TYPOGRAPHY,
-  UI_SPACING,
-  UI_LAYOUT,
 } from '../config/gameConfig';
+import { getGameState } from '../state/GameState';
 
 export class MenuScene extends Phaser.Scene {
-  private playButton?: Phaser.GameObjects.Container;
   private menuMusic?: Phaser.Sound.BaseSound;
   private isAudioUnlocked: boolean = false;
+  private buttons: Phaser.GameObjects.Container[] = [];
 
   constructor() {
     super({ key: 'MenuScene' });
@@ -37,14 +36,12 @@ export class MenuScene extends Phaser.Scene {
     // Handle audio unlock properly using Phaser's recommended pattern
     if (this.sound.locked) {
       console.log('🎵 Audio is locked, waiting for user gesture to unlock...');
-      // Listen for Phaser's unlocked event (fires after user gesture unlocks audio)
       this.sound.once('unlocked', () => {
         console.log('🎵 Audio unlocked by Phaser!');
         this.isAudioUnlocked = true;
         this.tryPlayMenuMusic();
       });
     } else {
-      // Audio already unlocked (rare, but possible)
       console.log('🎵 Audio already unlocked, playing immediately');
       this.isAudioUnlocked = true;
       this.tryPlayMenuMusic();
@@ -54,7 +51,6 @@ export class MenuScene extends Phaser.Scene {
     this.input.once('pointerdown', () => {
       console.log('🎵 First click detected - attempting audio unlock');
       if (!this.isAudioUnlocked) {
-        // Resume audio context if needed (for WebAudio)
         if (this.sound.context && this.sound.context.state === 'suspended') {
           console.log('🎵 Audio context suspended, resuming...');
           this.sound.context.resume().then(() => {
@@ -78,14 +74,14 @@ export class MenuScene extends Phaser.Scene {
       'menu_background'
     );
 
-    // Scale background to cover canvas (1920x1080 → 1280x720)
+    // Scale background to cover canvas (1920x1080 -> 1280x720)
     const scaleX = CANVAS.width / background.width;
     const scaleY = CANVAS.height / background.height;
     const scale = Math.max(scaleX, scaleY);
     background.setScale(scale);
 
     // Add overlay to darken background for better text readability
-    const overlay = this.add.rectangle(
+    this.add.rectangle(
       CANVAS.width / 2,
       CANVAS.height / 2,
       CANVAS.width,
@@ -97,16 +93,15 @@ export class MenuScene extends Phaser.Scene {
     // Add title text (center-top, pixel font)
     const titleText = this.add.text(
       CANVAS.width / 2,
-      120,
-      'COSTELINHA\nRUNNER',
+      100,
+      'COSTELINHA GO',
       {
         fontFamily: UI_TYPOGRAPHY.fontFamily,
-        fontSize: UI_TYPOGRAPHY.sizeXXL,
+        fontSize: UI_TYPOGRAPHY.sizeXL,
         color: UI_COLORS.primary,
         stroke: UI_COLORS.backgroundDark,
-        strokeThickness: 6,
+        strokeThickness: 5,
         align: 'center',
-        lineSpacing: 10,
       }
     );
     titleText.setOrigin(0.5, 0.5);
@@ -114,71 +109,100 @@ export class MenuScene extends Phaser.Scene {
     // Add subtitle/tagline
     const subtitleText = this.add.text(
       CANVAS.width / 2,
-      220,
+      160,
       'Collect All Bones!',
       {
         fontFamily: UI_TYPOGRAPHY.fontFamily,
-        fontSize: UI_TYPOGRAPHY.sizeMedium,
+        fontSize: UI_TYPOGRAPHY.sizeSmall,
         color: UI_COLORS.textAccent,
         stroke: UI_COLORS.backgroundDark,
-        strokeThickness: 3,
+        strokeThickness: 2,
         align: 'center',
       }
     );
     subtitleText.setOrigin(0.5, 0.5);
 
-    // Create Play button with pixel UI
-    this.playButton = this.createButton(
+    // Button configuration - smaller, tasteful, centered
+    const buttonStartY = CANVAS.height / 2 - 20;
+    const buttonSpacing = 70;
+
+    // PLAY button
+    this.createButton(
       CANVAS.width / 2,
-      CANVAS.height / 2 + 50,
+      buttonStartY,
       'PLAY',
-      () => {
-        console.log('🎮 Starting GameScene...');
-        // Play UI click sound (safely)
-        this.tryPlaySound('ui_click_sfx', 0.6);
-
-        // Stop menu music before transitioning
-        if (this.menuMusic) {
-          this.menuMusic.stop();
-          console.log('🎵 Menu music stopped');
-        }
-
-        this.scene.start('GameScene');
-      }
+      () => this.startGame()
     );
 
-    // Add controls instruction panel
-    this.createControlsPanel();
-
-    // Add credits at bottom
-    const creditsText = this.add.text(
+    // LEVEL SELECT button
+    this.createButton(
       CANVAS.width / 2,
-      CANVAS.height - 30,
-      'Made with Phaser 3 | Assets: Kenney.nl (CC0)',
-      {
-        fontFamily: UI_TYPOGRAPHY.fontFamily,
-        fontSize: UI_TYPOGRAPHY.sizeXS,
-        color: UI_COLORS.textSecondary,
-        align: 'center',
-      }
+      buttonStartY + buttonSpacing,
+      'LEVEL SELECT',
+      () => this.goToLevelSelect()
     );
-    creditsText.setOrigin(0.5, 0.5);
-    creditsText.setAlpha(0.7);
 
-    // Space key handler (alternative to button click)
+    // SETTINGS button
+    this.createButton(
+      CANVAS.width / 2,
+      buttonStartY + buttonSpacing * 2,
+      'SETTINGS',
+      () => this.goToSettings()
+    );
+
+    // Add subtle controls hint at bottom
+    this.createControlsHint();
+
+    // Space key handler (alternative to button click for quick play)
     this.input.keyboard?.on('keydown-SPACE', () => {
-      console.log('🎮 Starting GameScene...');
-      // Play UI click sound (safely)
-      this.tryPlaySound('ui_click_sfx', 0.6);
-
-      // Stop menu music before transitioning
-      if (this.menuMusic) {
-        this.menuMusic.stop();
-        console.log('🎵 Menu music stopped');
-      }
-
-      this.scene.start('GameScene');
+      this.startGame();
     });
+  }
+
+  /**
+   * Start the game at current/first level
+   */
+  private startGame() {
+    console.log('🎮 Starting GameScene...');
+    this.tryPlaySound('ui_click_sfx', 0.6);
+    this.stopMenuMusic();
+
+    // Get game state and start a new run from level 1
+    const gameState = getGameState();
+    gameState.startNewRun(1); // Reset HP and start from level 1
+    console.log(`🎮 Starting new run at level ${gameState.selectedLevelIndex}`);
+
+    this.scene.start('GameScene');
+  }
+
+  /**
+   * Navigate to Level Select scene
+   */
+  private goToLevelSelect() {
+    console.log('🎮 Going to LevelSelectScene...');
+    this.tryPlaySound('ui_click_sfx', 0.6);
+    this.stopMenuMusic();
+    this.scene.start('LevelSelectScene');
+  }
+
+  /**
+   * Navigate to Settings scene
+   */
+  private goToSettings() {
+    console.log('🎮 Going to SettingsScene...');
+    this.tryPlaySound('ui_click_sfx', 0.6);
+    this.stopMenuMusic();
+    this.scene.start('SettingsScene');
+  }
+
+  /**
+   * Stop menu music before scene transition
+   */
+  private stopMenuMusic() {
+    if (this.menuMusic) {
+      this.menuMusic.stop();
+      console.log('🎵 Menu music stopped');
+    }
   }
 
   /**
@@ -191,7 +215,6 @@ export class MenuScene extends Phaser.Scene {
         this.menuMusic.play();
         console.log(`🎵 Menu music play() called - isPlaying now: ${this.menuMusic.isPlaying}`);
 
-        // Additional debug: check volume and mute state
         const soundConfig = (this.menuMusic as Phaser.Sound.BaseSound & { volume?: number; mute?: boolean });
         console.log(`🎵 Music state - volume: ${soundConfig.volume}, mute: ${soundConfig.mute}`);
       } else if (this.menuMusic?.isPlaying) {
@@ -217,7 +240,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /**
-   * Creates a pixel-styled button with hover effects
+   * Creates a smaller, tasteful button with hover effects
    */
   private createButton(
     x: number,
@@ -227,18 +250,18 @@ export class MenuScene extends Phaser.Scene {
   ): Phaser.GameObjects.Container {
     const container = this.add.container(x, y);
 
-    // Button background (using Kenney UI asset)
+    // Button background (using Kenney UI asset) - smaller scale
     const buttonBg = this.add.image(0, 0, 'ui_button_rectangle');
-    buttonBg.setScale(3); // Scale up the pixel button
+    buttonBg.setScale(2.2); // Smaller scale than before (was 3)
     buttonBg.setTint(Phaser.Display.Color.HexStringToColor(UI_COLORS.primary).color);
 
-    // Button text
+    // Button text - smaller font
     const buttonText = this.add.text(0, 0, text, {
       fontFamily: UI_TYPOGRAPHY.fontFamily,
-      fontSize: UI_TYPOGRAPHY.sizeLarge,
+      fontSize: UI_TYPOGRAPHY.sizeMedium, // Smaller (was sizeLarge)
       color: UI_COLORS.buttonText,
       stroke: UI_COLORS.backgroundDark,
-      strokeThickness: 3,
+      strokeThickness: 2,
       align: 'center',
     });
     buttonText.setOrigin(0.5, 0.5);
@@ -250,14 +273,17 @@ export class MenuScene extends Phaser.Scene {
     // Make button interactive
     buttonBg.setInteractive({ useHandCursor: true });
 
+    // Store original y for animations
+    const originalY = y;
+
     // Hover effects
     buttonBg.on('pointerover', () => {
       buttonBg.setTint(Phaser.Display.Color.HexStringToColor(UI_COLORS.buttonHover).color);
-      container.setScale(1.05);
+      container.setScale(1.03);
       this.tweens.add({
         targets: container,
-        y: y - 5,
-        duration: 100,
+        y: originalY - 3,
+        duration: 80,
         ease: 'Power2',
       });
     });
@@ -267,17 +293,17 @@ export class MenuScene extends Phaser.Scene {
       container.setScale(1);
       this.tweens.add({
         targets: container,
-        y: y,
-        duration: 100,
+        y: originalY,
+        duration: 80,
         ease: 'Power2',
       });
     });
 
     buttonBg.on('pointerdown', () => {
-      container.setScale(0.95);
+      container.setScale(0.97);
       this.tweens.add({
         targets: container,
-        y: y + 2,
+        y: originalY + 2,
         duration: 50,
         ease: 'Power2',
         yoyo: true,
@@ -285,45 +311,23 @@ export class MenuScene extends Phaser.Scene {
       });
     });
 
-    // Add idle pulse animation
-    this.tweens.add({
-      targets: container,
-      scaleX: 1.02,
-      scaleY: 1.02,
-      duration: 1500,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
+    // Store reference
+    this.buttons.push(container);
 
     return container;
   }
 
   /**
-   * Creates a panel showing game controls with icons
+   * Creates a subtle controls hint at the bottom of the screen
    */
-  private createControlsPanel() {
-    const panelX = CANVAS.width / 2;
-    const panelY = CANVAS.height / 2 + 200;
+  private createControlsHint() {
+    const hintY = CANVAS.height - 50;
 
-    // Panel title
-    const titleText = this.add.text(panelX, panelY - 50, 'CONTROLS', {
-      fontFamily: UI_TYPOGRAPHY.fontFamily,
-      fontSize: UI_TYPOGRAPHY.sizeSmall,
-      color: UI_COLORS.textSecondary,
-      align: 'center',
-    });
-    titleText.setOrigin(0.5, 0.5);
-
-    // Arrow keys instruction
-    const arrowContainer = this.add.container(panelX - 120, panelY);
-
-    const arrowLeft = this.add.image(-30, 0, 'ui_arrow_left').setScale(1.5);
-    const arrowRight = this.add.image(30, 0, 'ui_arrow_right').setScale(1.5);
-    const arrowText = this.add.text(
-      0,
-      40,
-      'Move',
+    // Subtle controls text
+    const controlsText = this.add.text(
+      CANVAS.width / 2,
+      hintY,
+      '\u2190 \u2192 move  \u00B7  SPACE jump',
       {
         fontFamily: UI_TYPOGRAPHY.fontFamily,
         fontSize: UI_TYPOGRAPHY.sizeXS,
@@ -331,25 +335,7 @@ export class MenuScene extends Phaser.Scene {
         align: 'center',
       }
     );
-    arrowText.setOrigin(0.5, 0.5);
-    arrowContainer.add([arrowLeft, arrowRight, arrowText]);
-
-    // Space bar instruction
-    const spaceContainer = this.add.container(panelX + 120, panelY);
-
-    const spaceIcon = this.add.image(0, 0, 'ui_arrow_up').setScale(1.5);
-    const spaceText = this.add.text(
-      0,
-      40,
-      'Jump',
-      {
-        fontFamily: UI_TYPOGRAPHY.fontFamily,
-        fontSize: UI_TYPOGRAPHY.sizeXS,
-        color: UI_COLORS.textSecondary,
-        align: 'center',
-      }
-    );
-    spaceText.setOrigin(0.5, 0.5);
-    spaceContainer.add([spaceIcon, spaceText]);
+    controlsText.setOrigin(0.5, 0.5);
+    controlsText.setAlpha(0.6); // Muted appearance
   }
 }
